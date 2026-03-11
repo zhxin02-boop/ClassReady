@@ -1,0 +1,574 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>汉语预习助手 - HSK 3 第6课</title>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <style>
+        body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; background-color: #f4f7f6; margin: 0; padding: 0; color: #333; padding-bottom: 70px; }
+        #app { max-width: 600px; margin: 0 auto; min-height: 100vh; background: #fff; box-shadow: 0 0 15px rgba(0,0,0,0.05); position: relative; }
+        .header { text-align: center; padding: 20px 15px 10px; background: #fff; border-bottom: 1px solid #eee; }
+        .header h2 { margin: 0 0 5px 0; font-size: 20px; }
+        .header p { margin: 0; color: #888; font-size: 14px; }
+        .content-area { padding: 20px; }
+
+        .tab-bar { position: fixed; bottom: 0; left: 0; right: 0; height: 60px; background: #ffffff; display: flex; justify-content: space-around; align-items: center; box-shadow: 0 -2px 10px rgba(0,0,0,0.05); max-width: 600px; margin: 0 auto; z-index: 1000; }
+        .tab-item { display: flex; flex-direction: column; align-items: center; justify-content: center; color: #888; font-size: 12px; cursor: pointer; width: 33.33%; height: 100%; transition: color 0.3s; }
+        .tab-icon { font-size: 22px; margin-bottom: 3px; }
+        .tab-item.active { color: #4CAF50; font-weight: bold; }
+
+        /* ================= 生词卡片样式优化 (解决苹果手机 3D 穿透 Bug) ================= */
+        .flashcard-container { width: 100%; height: 420px; perspective: 1000px; margin-bottom: 20px; }
+        .flashcard { width: 100%; height: 100%; position: relative; transition: transform 0.6s; transform-style: preserve-3d; cursor: pointer; }
+        .flashcard.flipped { transform: rotateY(180deg); }
+        .card-face { 
+            position: absolute; width: 100%; height: 100%; 
+            backface-visibility: hidden; 
+            -webkit-backface-visibility: hidden; /* ★ 专门针对 iOS 系统的防穿透修复 */
+            border-radius: 16px; box-shadow: 0 6px 16px rgba(0,0,0,0.08); 
+            display: flex; flex-direction: column; justify-content: center; align-items: center; 
+            padding: 15px 20px; box-sizing: border-box; text-align: center; 
+        }
+        .card-front { background-color: #ffffff; border: 2px solid #f0f0f0; transform: rotateY(0deg); }
+        .word-large { font-size: 48px; font-weight: bold; color: #2c3e50; margin-bottom: 15px;}
+        .click-hint { position: absolute; bottom: 15px; font-size: 13px; color: #aaa; }
+        .card-back { background-color: #e8f5e9; color: #2e7d32; transform: rotateY(180deg); }
+        .pinyin { font-size: 22px; margin-bottom: 8px; }
+        .english { font-size: 16px; font-weight: bold; margin-bottom: 15px; color: #333; }
+        .example-box { background: rgba(255,255,255,0.8); padding: 10px; border-radius: 8px; width: 100%; }
+        .example-cn { font-size: 15px; margin-bottom: 4px; color: #333;}
+        .example-py { font-size: 13px; margin-bottom: 4px; color: #666;}
+        .example-en { font-size: 12px; color: #555; font-style: italic;}
+        
+        /* ★ 移除了 z-index，并增加了防穿透属性，彻底解决重叠问题 */
+        .tts-btn { 
+            background: #e3f2fd; color: #1565c0; border: 1px solid #bbdefb; 
+            padding: 6px 16px; border-radius: 20px; font-size: 14px; cursor: pointer; 
+            font-weight: bold; transition: all 0.2s; margin-bottom: 5px;
+            backface-visibility: hidden; -webkit-backface-visibility: hidden;
+        }
+        .tts-btn:active { background: #bbdefb; transform: scale(0.95); }
+        .card-back .tts-btn { background: #c8e6c9; color: #2e7d32; border-color: #a5d6a7; margin-bottom: 12px;}
+
+        .controls { display: flex; justify-content: space-between; gap: 15px; }
+        .controls button { flex: 1; padding: 12px; font-size: 16px; border: none; border-radius: 8px; background-color: #4CAF50; color: white; cursor: pointer; }
+        .controls button:disabled { background-color: #ccc; cursor: not-allowed; }
+        .progress-text { text-align: center; margin-top: 15px; color: #888; font-size: 14px; }
+
+        /* ================= 课文阅读排版优化 ================= */
+        .control-panel { display: flex; justify-content: space-between; align-items: center; background: #e3f2fd; padding: 12px 15px; border-radius: 8px; margin-bottom: 25px; }
+        .switch-container { display: flex; align-items: center; gap: 10px; font-weight: bold; color: #1565c0; cursor: pointer; font-size: 14px;}
+        .switch { position: relative; display: inline-block; width: 44px; height: 24px; }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #ccc; transition: .4s; border-radius: 34px; }
+        .slider:before { position: absolute; content: ""; height: 18px; width: 18px; left: 3px; bottom: 3px; background-color: white; transition: .4s; border-radius: 50%; }
+        input:checked + .slider { background-color: #4CAF50; }
+        input:checked + .slider:before { transform: translateX(20px); }
+        
+        .scene { margin-bottom: 30px; border-left: 4px solid #4CAF50; padding-left: 15px; }
+        .scene-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
+        .scene-title { font-size: 16px; color: #4CAF50; font-weight: bold; }
+        .play-btn { background: #ff9800; color: white; border: none; padding: 6px 12px; border-radius: 20px; font-size: 12px; font-weight: bold; cursor: pointer; box-shadow: 0 2px 4px rgba(0,0,0,0.1); flex-shrink: 0;}
+        
+        .dialogue-line { display: flex; flex-direction: column; margin-bottom: 15px; padding: 12px; border-radius: 12px; background-color: #fcfcfc; transition: all 0.3s ease; cursor: pointer; border: 2px solid transparent;}
+        .dialogue-line:hover { background-color: #f5f5f5; }
+        .dialogue-line.highlight { background-color: #fff8e1; border-color: #ffb300; box-shadow: 0 4px 10px rgba(255, 179, 0, 0.15); transform: scale(1.02);}
+        
+        .speaker { align-self: flex-start; background: #e0f2f1; color: #2e7d32; padding: 4px 10px; border-radius: 6px; font-size: 12px; font-weight: bold; margin-bottom: 8px; }
+        
+        .text-content { display: flex; flex-direction: column; gap: 4px; margin-bottom: 5px; }
+        .pinyin-line { font-size: 15px; color: #777; line-height: 1.4; word-break: break-word; }
+        .chinese-line { font-size: 18px; color: #222; line-height: 1.5; word-break: break-word; }
+        .english-translation { font-size: 14px; color: #999; margin-top: 6px; font-style: italic; border-top: 1px dashed #eee; padding-top: 8px; word-break: break-word;}
+
+        /* ================= 测验模块样式 ================= */
+        .quiz-progress-bar { width: 100%; height: 6px; background: #e0e0e0; border-radius: 3px; margin-bottom: 20px; overflow: hidden; }
+        .quiz-progress-fill { height: 100%; background: #4CAF50; transition: width 0.3s ease; }
+        .question-type { font-size: 12px; color: #1976d2; font-weight: bold; margin-bottom: 10px; }
+        .question-text { font-size: 18px; font-weight: bold; margin-bottom: 20px; line-height: 1.4; }
+        .options-container { display: flex; flex-direction: column; gap: 10px; }
+        .option-btn { background: #f8f9fa; border: 2px solid #e9ecef; padding: 14px; border-radius: 10px; font-size: 15px; cursor: pointer; text-align: left; transition: all 0.2s; word-break: break-word;}
+        .option-btn.correct { background: #e8f5e9; border-color: #4CAF50; color: #2e7d32; font-weight: bold; }
+        .option-btn.wrong { background: #ffebee; border-color: #f44336; color: #c62828; text-decoration: line-through; }
+        .action-area { margin-top: 25px; text-align: center; min-height: 45px; }
+        .next-btn { background: #1976d2; color: white; border: none; padding: 12px 30px; font-size: 16px; border-radius: 8px; cursor: pointer; width: 100%; }
+        .result-screen { text-align: center; padding: 20px 0; }
+        .score { font-size: 60px; font-weight: bold; color: #4CAF50; margin: 10px 0; }
+        .restart-btn { background: #ff9800; color: white; border: none; padding: 12px 30px; font-size: 16px; border-radius: 8px; cursor: pointer; width: 100%; margin-top: 20px;}
+        
+        .name-input-container { text-align: center; padding: 40px 20px; }
+        .name-input { width: 100%; padding: 15px; font-size: 18px; border: 2px solid #e0e0e0; border-radius: 8px; margin-bottom: 20px; text-align: center; box-sizing: border-box; }
+        .name-input:focus { border-color: #4CAF50; outline: none; }
+        .weak-points-box { background: #ffebee; padding: 15px; border-radius: 8px; margin: 20px 0; text-align: left; }
+
+        .typing-input { width: 100%; padding: 15px; font-size: 20px; border: 2px solid #e0e0e0; border-radius: 8px; box-sizing: border-box; text-align: center; letter-spacing: 2px; }
+        .typing-input:focus { border-color: #1976d2; outline: none; box-shadow: 0 0 5px rgba(25,118,210,0.3); }
+        .check-btn { margin-top: 15px; width: 100%; padding: 12px; background: #ff9800; color: white; border: none; border-radius: 8px; font-size: 16px; cursor: pointer; font-weight: bold; }
+        .check-btn:disabled { background: #ccc; cursor: not-allowed; }
+        .input-feedback { margin-top: 15px; font-size: 16px; font-weight: bold; padding: 10px; border-radius: 8px;}
+        .input-correct { background-color: #e8f5e9; color: #2e7d32; border: 1px solid #4CAF50; }
+        .input-wrong { background-color: #ffebee; color: #c62828; border: 1px solid #f44336; }
+    </style>
+</head>
+<body>
+
+<div id="app">
+    <div class="header">
+        <h2>{{ lessonTitle }}</h2>
+        <p>{{ lessonEnglishTitle }}</p>
+    </div>
+
+    <div class="content-area">
+        
+        <div v-show="currentTab === 'vocab'">
+            <div class="flashcard-container" @click="toggleFlip">
+                <div class="flashcard" :class="{ flipped: isFlipped }">
+                    <div class="card-face card-front">
+                        <div class="word-large">{{ currentWord.word }}</div>
+                        <button class="tts-btn" @click.stop="playVocabAudio(currentWord.word)">🔊 听读音</button>
+                        <div class="click-hint">点击空白处翻转 (Tap card to flip)</div>
+                    </div>
+                    <div class="card-face card-back">
+                        <button class="tts-btn" @click.stop="playVocabAudio(currentWord.word)">🔊 听读音</button>
+                        <div class="pinyin">{{ currentWord.pinyin }}</div>
+                        <div class="english">{{ currentWord.english }}</div>
+                        <div class="example-box">
+                            <div class="example-cn">{{ currentWord.example.chinese }}</div>
+                            <div class="example-py">{{ currentWord.example.pinyin }}</div>
+                            <div class="example-en">{{ currentWord.example.english }}</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="controls">
+                <button @click="prevWord" :disabled="vocabIndex === 0">上一个 (Prev)</button>
+                <button @click="nextWord" :disabled="vocabIndex === vocabData.length - 1">下一个 (Next)</button>
+            </div>
+            <div class="progress-text">{{ vocabIndex + 1 }} / {{ vocabData.length }}</div>
+        </div>
+
+        <div v-show="currentTab === 'read'">
+            <div class="control-panel">
+                <label class="switch-container">
+                    <div class="switch">
+                        <input type="checkbox" v-model="showPinyin">
+                        <span class="slider"></span>
+                    </div>
+                    <span>{{ showPinyin ? '隐藏拼音 (Hide)' : '显示拼音 (Show)' }}</span>
+                </label>
+                <span style="font-size: 12px; color: #888;">💡 点击句子直接播放</span>
+            </div>
+            
+            <div class="scene" v-for="scene in readingData" :key="scene.textId">
+                <div class="scene-header">
+                    <div class="scene-title">{{ scene.context }}</div>
+                    <button class="play-btn" @click="togglePlay(scene)">
+                        {{ scene.isPlaying ? '⏸ 暂停 (Pause)' : '▶ 播放 (Play)' }}
+                    </button>
+                </div>
+                
+                <div class="dialogue-line" 
+                     v-for="(line, index) in scene.dialogue" :key="index"
+                     :class="{ 'highlight': scene.activeIndex === index }"
+                     @click="playFromLine(scene, line.startTime)">
+                    <div class="speaker">{{ line.speaker }}</div>
+                    <div class="text-content">
+                        <div class="pinyin-line" v-show="showPinyin">{{ line.pinyin }}</div>
+                        <div class="chinese-line">{{ line.chinese }}</div>
+                    </div>
+                    <div class="english-translation">{{ line.english }}</div>
+                </div>
+            </div>
+        </div>
+
+        <div v-show="currentTab === 'quiz'">
+            <div v-if="!studentNameEntered" class="name-input-container">
+                <h3 style="color: #1976d2; margin-bottom: 10px;">Who are you?</h3>
+                <p style="color: #888; font-size: 14px; margin-bottom: 25px;">Please enter your name to start the quiz</p>
+                <input v-model="studentName" type="text" class="name-input" placeholder="Your Name" />
+                <button @click="startQuiz" :disabled="!studentName.trim()" class="next-btn" style="background-color: #4CAF50;">开始测验 (Start)</button>
+            </div>
+
+            <div v-else-if="!showQuizResult">
+                <div class="quiz-progress-bar">
+                    <div class="quiz-progress-fill" :style="{ width: quizProgress + '%' }"></div>
+                </div>
+                
+                <div class="question-type">
+                    <span v-if="currentQuestion.type === 'choice' && currentQuestion.kp.includes('课文理解')">📖 课文理解 (Reading Comprehension)</span>
+                    <span v-else-if="currentQuestion.type === 'choice'">📝 选择题 (Multiple Choice)</span>
+                    <span v-else-if="currentQuestion.type === 'fill'">👆 选词填空 (Fill in the blank)</span>
+                    <span v-else>✍️ 拼写输入 (Type in Chinese)</span>
+                </div>
+                
+                <div class="question-text" v-html="currentQuestion.question"></div>
+                
+                <div class="options-container" v-if="currentQuestion.type === 'choice' || currentQuestion.type === 'fill'">
+                    <button 
+                        v-for="(option, index) in currentQuestion.options" :key="index"
+                        class="option-btn" :class="getOptionClass(option)"
+                        :disabled="isAnswered" @click="selectOption(option)">
+                        {{ option }}
+                    </button>
+                </div>
+
+                <div class="input-container" v-else-if="currentQuestion.type === 'input'">
+                    <input type="text" v-model="inputText" :disabled="isAnswered" placeholder="请在此输入中文词语" class="typing-input" />
+                    <button v-if="!isAnswered" @click="checkInput" class="check-btn" :disabled="!inputText.trim()">提交答案 (Submit)</button>
+                    
+                    <div v-if="isAnswered" class="input-feedback" :class="{'input-correct': inputResult, 'input-wrong': !inputResult}">
+                        {{ inputResult ? '✅ 回答正确！(Correct)' : '❌ 错误。正确答案是 (Answer): ' + currentQuestion.correctAnswer }}
+                    </div>
+                </div>
+
+                <div class="action-area">
+                    <button class="next-btn" v-show="isAnswered" @click="nextQuestion">
+                        <span v-if="isSubmitting">上传中 (Submitting)...</span>
+                        <span v-else>{{ quizIndex === quizData.length - 1 ? '查看成绩并提交 (Submit)' : '下一题 (Next)' }}</span>
+                    </button>
+                </div>
+            </div>
+
+            <div v-else class="result-screen">
+                <h2>🎉 Quiz Completed, {{ studentName }}!</h2>
+                <div class="score">{{ quizScore }} / {{ quizData.length }}</div>
+                
+                <div v-if="wrongKPs.length > 0" class="weak-points-box">
+                    <p style="color: #c62828; font-weight: bold; margin-top: 0;">需要复习的知识点 (Needs Review):</p>
+                    <ul style="color: #d32f2f; font-size: 14px; padding-left: 20px; margin-bottom: 0;">
+                        <li v-for="kp in wrongKPs" :key="kp" style="margin-bottom: 5px;">{{ kp }}</li>
+                    </ul>
+                </div>
+                <div v-else style="color: #4CAF50; font-weight: bold; margin: 20px 0; font-size: 18px;">
+                    Perfect! 满分通过！
+                </div>
+
+                <div v-if="submitSuccess" style="color: #4CAF50; font-size: 12px; margin-bottom: 20px;">
+                    ✅ 成绩已成功发送给老师 (Score submitted to teacher)
+                </div>
+
+                <button class="restart-btn" @click="restartQuiz">再测一次 (Try Again)</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="tab-bar">
+        <div class="tab-item" :class="{ active: currentTab === 'vocab' }" @click="currentTab = 'vocab'">
+            <div class="tab-icon">📖</div><span>生词 Vocab</span>
+        </div>
+        <div class="tab-item" :class="{ active: currentTab === 'read' }" @click="pauseAllAudio(); currentTab = 'read'">
+            <div class="tab-icon">🎧</div><span>课文 Read</span>
+        </div>
+        <div class="tab-item" :class="{ active: currentTab === 'quiz' }" @click="currentTab = 'quiz'">
+            <div class="tab-icon">📝</div><span>小测 Quiz</span>
+        </div>
+    </div>
+</div>
+
+<script>
+    const { createApp, ref, computed } = Vue;
+
+    createApp({
+        setup() {
+            const lessonTitle = ref("第 6 课：怎么突然找不到了");
+            const lessonEnglishTitle = ref("Why are they suddenly missing");
+            const currentTab = ref('vocab'); 
+
+            const vocabData = ref([
+                { word: "眼镜", pinyin: "yǎnjìng", english: "glasses", example: { chinese: "没有眼镜，我看不清楚。", pinyin: "Méiyǒu yǎnjìng, wǒ kàn bu qīngchu." } },
+                { word: "突然", pinyin: "tūrán", english: "suddenly", example: { chinese: "怎么突然找不到了？", pinyin: "Zěnme tūrán zhǎo bu dào le?" } },
+                { word: "离开", pinyin: "lí kāi", english: "to leave", example: { chinese: "我离不开你。", pinyin: "Wǒ lí bu kāi nǐ." } },
+                { word: "清楚", pinyin: "qīngchu", english: "clear", example: { chinese: "你听清楚了吗？", pinyin: "Nǐ tīng qīngchu le ma?" } },
+                { word: "刚才", pinyin: "gāngcái", english: "just now", example: { chinese: "是不是刚才放在桌子上了？", pinyin: "Shì bu shì gāngcái fàng zài zhuōzi shang le?" } },
+                { word: "帮忙", pinyin: "bāng máng", english: "to help", example: { chinese: "你快过来帮忙啊。", pinyin: "Nǐ kuài guòlai bāng máng a." } },
+                { word: "特别", pinyin: "tèbié", english: "extraordinarily", example: { chinese: "今天这些题特别难。", pinyin: "Jīntiān zhèxiē tí tèbié nán." } },
+                { word: "讲", pinyin: "jiǎng", english: "to explain", example: { chinese: "我给你讲讲。", pinyin: "Wǒ gěi nǐ jiǎngjiang." } },
+                { word: "明白", pinyin: "míngbai", english: "clear", example: { chinese: "电话里讲不明白。", pinyin: "Diànhuà lǐ jiǎng bu míngbai." } },
+                { word: "锻炼", pinyin: "duànliàn", english: "to exercise", example: { chinese: "我锻炼完了就过去。", pinyin: "Wǒ duànliàn wán le jiù guòqu." } },
+                { word: "音乐", pinyin: "yīnyuè", english: "music", example: { chinese: "她喜欢听音乐。", pinyin: "Tā xǐhuan tīng yīnyuè." } },
+                { word: "公园", pinyin: "gōngyuán", english: "park", example: { chinese: "去公园走走吧。", pinyin: "Qù gōngyuán zǒuzou ba." } },
+                { word: "聊天(儿)", pinyin: "liáo tiān(r)", english: "to chat", example: { chinese: "我们在公园聊聊天儿吧。", pinyin: "Wǒmen zài gōngyuán liáoliao tiānr ba." } },
+                { word: "睡着", pinyin: "shuì zháo", english: "to fall asleep", example: { chinese: "晚上睡不着觉。", pinyin: "Wǎnshang shuì bu zháo jiào." } },
+                { word: "更", pinyin: "gèng", english: "more", example: { chinese: "喝牛奶可以睡得更好些。", pinyin: "Hē niúnǎi kěyǐ shuì de gèng hǎo xiē." } }
+            ]);
+            const vocabIndex = ref(0);
+            const isFlipped = ref(false);
+            const currentWord = computed(() => vocabData.value[vocabIndex.value]);
+            const toggleFlip = () => isFlipped.value = !isFlipped.value;
+            const nextWord = () => { if (vocabIndex.value < vocabData.value.length - 1) { isFlipped.value = false; setTimeout(() => vocabIndex.value++, 150); } };
+            const prevWord = () => { if (vocabIndex.value > 0) { isFlipped.value = false; setTimeout(() => vocabIndex.value--, 150); } };
+
+            const playVocabAudio = (text) => {
+                if ('speechSynthesis' in window) {
+                    window.speechSynthesis.cancel();
+                    const utterance = new SpeechSynthesisUtterance(text);
+                    utterance.lang = 'zh-CN'; 
+                    utterance.rate = 0.85;    
+                    window.speechSynthesis.speak(utterance);
+                } else {
+                    alert("您的浏览器不支持语音合成功能。");
+                }
+            };
+
+            const showPinyin = ref(true);
+            const readingData = ref([
+                {
+                    textId: 1, context: "在客厅 / In the living room", audioSrc: "audio/text1.mp3", activeIndex: -1, isPlaying: false, audioObj: null, textStartTime: 21, textEndTime: 51,
+                    dialogue: [
+                        { speaker: "周明", chinese: "我的眼镜呢？怎么突然找不到了？你看见了吗？", pinyin: "Wǒ de yǎnjìng ne? Zěnme tūrán zhǎo bu dào le? Nǐ kànjiàn le ma?", english: "Where are my glasses? Why are they suddenly missing?" },
+                        { speaker: "周太太", chinese: "我没看见啊。", pinyin: "Wǒ méi kànjiàn a.", english: "I haven't seen them." },
+                        { speaker: "周明", chinese: "我离不开眼镜，没有眼镜，我一个字也看不清楚。", pinyin: "Wǒ lí bu kāi yǎnjìng, méiyǒu yǎnjìng, wǒ yí ge zì yě kàn bu qīngchu.", english: "I can't do without my glasses. I can't see a single word clearly." },
+                        { speaker: "周太太", chinese: "你去房间找找，是不是刚才放在桌子上了？", pinyin: "Nǐ qù fángjiān zhǎozhao, shì bu shì gāngcái fàng zài zhuōzi shang le?", english: "Go look in the room. Did you put them on the table?" },
+                        { speaker: "周明", chinese: "我怎么看得到啊？你快过来帮忙啊。", pinyin: "Wǒ zěnme kàn de dào a? Nǐ kuài guòlai bāng máng a.", english: "How can I see them? Come help me." },
+                        { speaker: "周太太", chinese: "好吧，我帮你去找找。", pinyin: "Hǎo ba, wǒ bāng nǐ qù zhǎozhao.", english: "All right, I'll help you look for them." }
+                    ]
+                },
+                {
+                    textId: 2, context: "在打电话 / On the phone", audioSrc: "audio/text2.mp3", activeIndex: -1, isPlaying: false, audioObj: null, textStartTime: 10, textEndTime: 30,
+                    dialogue: [
+                        { speaker: "同学", chinese: "今天的作业你做完了吗？", pinyin: "Jīntiān de zuòyè nǐ zuòwán le ma?", english: "Have you finished today's homework?" },
+                        { speaker: "儿子", chinese: "刚做完，你呢？", pinyin: "Gāng zuòwán, nǐ ne?", english: "Just finished. How about you?" },
+                        { speaker: "同学", chinese: "今天这些题特别难，我看不懂，不会做，你能帮我吗？", pinyin: "Jīntiān zhèxiē tí tèbié nán, wǒ kàn bu dǒng, bú huì zuò, nǐ néng bāng wǒ ma?", english: "These questions are extraordinarily difficult. Can you help me?" },
+                        { speaker: "儿子", chinese: "电话里讲不明白，你来我家吧，我给你讲讲。", pinyin: "Diànhuà lǐ jiǎng bu míngbai, nǐ lái wǒ jiā ba, wǒ gěi nǐ jiǎngjiang.", english: "I can't explain it clearly on the phone. Come to my house." },
+                        { speaker: "同学", chinese: "好啊，我锻炼完了就过去。", pinyin: "Hǎo a, wǒ duànliàn wán le jiù guòqu.", english: "OK, I'll go over after I finish exercising." }
+                    ]
+                },
+                {
+                    textId: 3, context: "在休息室 / In the lounge", audioSrc: "audio/text3.mp3", activeIndex: -1, isPlaying: false, audioObj: null, textStartTime: 10, textEndTime: 35,
+                    dialogue: [
+                        { speaker: "同事", chinese: "你怎么有点儿不高兴？", pinyin: "Nǐ zěnme yǒudiǎnr bù gāoxìng?", english: "Why are you a little unhappy?" },
+                        { speaker: "小刚", chinese: "我想请小丽吃饭，但是找不到好饭馆。", pinyin: "Wǒ xiǎng qǐng Xiǎolì chī fàn, dànshì zhǎo bu dào hǎo fànguǎn.", english: "I want to treat Xiaoli to dinner, but can't find a restaurant." },
+                        { speaker: "同事", chinese: "那你请她听音乐会吧，她喜欢听音乐。", pinyin: "Nà nǐ qǐng tā tīng yīnyuèhuì ba, tā xǐhuan tīng yīnyuè.", english: "Then invite her to a concert. She likes music." },
+                        { speaker: "小刚", chinese: "音乐会人太多，买不到票。", pinyin: "Yīnyuèhuì rén tài duō, mǎi bu dào piào.", english: "There are too many people at concerts. I can't buy tickets." },
+                        { speaker: "同事", chinese: "那去公园走走，聊聊天儿吧。", pinyin: "Nà qù gōngyuán zǒuzou, liáoliao tiānr ba.", english: "Then take a walk in the park and chat." },
+                        { speaker: "小刚", chinese: "公园太大，多累啊。", pinyin: "Gōngyuán tài dà, duō lèi a.", english: "Parks are too big. It'll be so tiring." }
+                    ]
+                },
+                {
+                    textId: 4, context: "在客厅 / In the living room", audioSrc: "audio/text4.mp3", activeIndex: -1, isPlaying: false, audioObj: null, textStartTime: 11, textEndTime: 33,
+                    dialogue: [
+                        { speaker: "周太太", chinese: "你怎么还喝咖啡？", pinyin: "Nǐ zěnme hái hē kāfēi?", english: "Why are you still drinking coffee?" },
+                        { speaker: "周明", chinese: "怎么了？", pinyin: "Zěnme le?", english: "What's wrong?" },
+                        { speaker: "周太太", chinese: "你不是说晚上睡不着觉吗？", pinyin: "Nǐ bú shì shuō wǎnshang shuì bu zháo jiào ma?", english: "Didn't you say you couldn't sleep at night?" },
+                        { speaker: "周明", chinese: "没事，我只喝一杯。", pinyin: "Méi shì, wǒ zhǐ hē yì bēi.", english: "It's okay, I only have one cup." },
+                        { speaker: "周太太", chinese: "你还喝杯牛奶吧，可以睡得更好些。", pinyin: "Nǐ hái hē bēi niúnǎi ba, kěyǐ shuì de gèng hǎo xiē.", english: "You'd better drink a glass of milk, you can sleep better." },
+                        { speaker: "周明", chinese: "好吧，牛奶呢？", pinyin: "Hǎo ba, niúnǎi ne?", english: "Okay, where's the milk?" },
+                        { speaker: "周太太", chinese: "还没买呢。", pinyin: "Hái méi mǎi ne.", english: "I haven't bought it yet." }
+                    ]
+                }
+            ]);
+
+            readingData.value.forEach(scene => {
+                const totalDuration = scene.textEndTime - scene.textStartTime;
+                const totalChars = scene.dialogue.reduce((sum, line) => sum + line.chinese.length, 0);
+                let currentStartTime = scene.textStartTime;
+                scene.dialogue.forEach(line => {
+                    const lineDuration = totalDuration * (line.chinese.length / totalChars);
+                    line.startTime = currentStartTime;
+                    line.endTime = currentStartTime + lineDuration;
+                    currentStartTime += lineDuration; 
+                });
+            });
+
+            const pauseAllAudio = () => {
+                readingData.value.forEach(scene => {
+                    if(scene.audioObj) { scene.audioObj.pause(); scene.isPlaying = false; scene.activeIndex = -1; }
+                });
+                if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+            };
+
+            const togglePlay = (scene) => {
+                readingData.value.forEach(s => {
+                    if(s.textId !== scene.textId && s.audioObj) { s.audioObj.pause(); s.isPlaying = false; s.activeIndex = -1; }
+                });
+
+                if (!scene.audioObj) {
+                    scene.audioObj = new Audio(scene.audioSrc);
+                    scene.audioObj.addEventListener('timeupdate', () => {
+                        const ct = scene.audioObj.currentTime;
+                        if (ct < scene.textStartTime || ct > scene.textEndTime) { scene.activeIndex = -1; } 
+                        else { const idx = scene.dialogue.findIndex(l => ct >= l.startTime && ct < l.endTime); scene.activeIndex = idx; }
+                    });
+                    scene.audioObj.addEventListener('ended', () => { scene.activeIndex = -1; scene.isPlaying = false; });
+                }
+                
+                if (scene.isPlaying) { scene.audioObj.pause(); scene.isPlaying = false; } 
+                else { scene.audioObj.currentTime = scene.textStartTime; scene.audioObj.play().catch(e => { console.error("音频播放失败", e); alert("音频播放失败，请检查路径。"); }); scene.isPlaying = true; }
+            };
+
+            const playFromLine = (scene, startTime) => {
+                readingData.value.forEach(s => {
+                    if(s.textId !== scene.textId && s.audioObj) { s.audioObj.pause(); s.isPlaying = false; s.activeIndex = -1; }
+                });
+
+                if (!scene.audioObj) {
+                    scene.audioObj = new Audio(scene.audioSrc);
+                    scene.audioObj.addEventListener('timeupdate', () => {
+                        const ct = scene.audioObj.currentTime;
+                        if (ct < scene.textStartTime || ct > scene.textEndTime) { scene.activeIndex = -1; } 
+                        else { const idx = scene.dialogue.findIndex(l => ct >= l.startTime && ct < l.endTime); scene.activeIndex = idx; }
+                    });
+                    scene.audioObj.addEventListener('ended', () => { scene.activeIndex = -1; scene.isPlaying = false; });
+                }
+                scene.audioObj.currentTime = startTime; 
+                scene.audioObj.play().catch(e => { console.error(e); alert("音频文件播放失败。"); });
+                scene.isPlaying = true;
+            };
+
+            const studentName = ref('');
+            const studentNameEntered = ref(false);
+            const wrongRecords = ref([]);
+            const isSubmitting = ref(false);
+            const submitSuccess = ref(false);
+            
+            const inputText = ref('');
+            const inputResult = ref(false);
+
+            const originalQuizData = [
+                { kp: "词汇：眼镜", type: 'choice', question: "What is the correct meaning for '眼镜' (yǎnjìng)?", options: ["Park", "Music", "Glasses", "To help"], correctAnswer: "Glasses" },
+                { kp: "词汇：突然", type: 'choice', question: "What is the correct meaning for '突然' (tūrán)?", options: ["Clear", "Suddenly", "To chat", "To explain"], correctAnswer: "Suddenly" },
+                { kp: "词汇：清楚", type: 'choice', question: "Which word means 'Clear / Distinct'?", options: ["清楚 (qīngchu)", "特别 (tèbié)", "明白 (míngbai)", "更 (gèng)"], correctAnswer: "清楚 (qīngchu)" },
+                { kp: "词汇：离开", type: 'choice', question: "What is the correct meaning for '离开' (lí kāi)?", options: ["To sleep", "To leave", "To exercise", "To help"], correctAnswer: "To leave" },
+                { kp: "词汇：刚才", type: 'choice', question: "Which word means 'Just now'?", options: ["突然 (tūrán)", "刚才 (gāngcái)", "特别 (tèbié)", "更 (gèng)"], correctAnswer: "刚才 (gāngcái)" },
+                { kp: "词汇：帮忙", type: 'choice', question: "What is the correct meaning for '帮忙' (bāng máng)?", options: ["To help", "To chat", "To understand", "To explain"], correctAnswer: "To help" },
+                { kp: "词汇：明白", type: 'choice', question: "What is the correct meaning for '明白' (míngbai)?", options: ["Glasses", "To understand / Clear", "Music", "Park"], correctAnswer: "To understand / Clear" },
+                { kp: "词汇：睡着", type: 'choice', question: "Which word means 'To fall asleep'?", options: ["睡着 (shuì zháo)", "聊天 (liáo tiān)", "离开 (lí kāi)", "讲 (jiǎng)"], correctAnswer: "睡着 (shuì zháo)" },
+                
+                { kp: "语法：结果补语 (看不清楚)", type: 'fill', question: "我离不开眼镜，没有眼镜，我一个字也看不______。", options: ["明白", "清楚", "到"], correctAnswer: "清楚" },
+                { kp: "语法：可能补语 (找不到了)", type: 'fill', question: "我的眼镜呢？怎么______找不到了？", options: ["突然", "刚才", "特别"], correctAnswer: "突然" },
+                { kp: "词汇：帮忙", type: 'fill', question: "我怎么看得到啊？你快过来______啊。", options: ["讲讲", "聊天", "帮忙"], correctAnswer: "帮忙" },
+                { kp: "语法：结果补语 (讲不明白)", type: 'fill', question: "电话里______不明白，你来我家吧。", options: ["讲", "听", "看"], correctAnswer: "讲" },
+                { kp: "语法：程度副词 (特别难)", type: 'fill', question: "今天这些题______难，我看不懂。", options: ["更", "特别", "刚才"], correctAnswer: "特别" },
+                { kp: "语法：可能补语 (买不到)", type: 'fill', question: "音乐会人太多，买不______票。", options: ["到", "去", "完"], correctAnswer: "到" },
+                { kp: "语法：可能补语 (睡不着)", type: 'fill', question: "你不是说晚上睡不______觉吗？", options: ["着", "好", "到"], correctAnswer: "着" },
+                { kp: "语法：更的用法", type: 'fill', question: "你还喝杯牛奶吧，可以睡得______好些。", options: ["更", "最", "很"], correctAnswer: "更" },
+                
+                { kp: "拼写：锻炼", type: 'input', question: "Please type the Chinese characters for <b>'to exercise'</b>:", correctAnswer: "锻炼" },
+                { kp: "拼写：音乐", type: 'input', question: "Please type the Chinese characters for <b>'music'</b>:", correctAnswer: "音乐" },
+                { kp: "拼写：聊天", type: 'input', question: "Please type the Chinese characters for <b>'to chat'</b>:", correctAnswer: "聊天" },
+                { kp: "拼写：公园", type: 'input', question: "Please type the Chinese characters for <b>'park'</b>:", correctAnswer: "公园" },
+
+                { kp: "课文理解：课文1", type: 'choice', question: "根据课文 1，周明为什么看不清楚？", options: ["房间太黑了", "他没戴眼镜", "报纸的字太小", "他不想看"], correctAnswer: "他没戴眼镜" },
+                { kp: "课文理解：课文2", type: 'choice', question: "根据课文 2，同学等会儿去儿子家做什么？", options: ["一起锻炼身体", "请儿子讲题", "在家里聊天儿", "听音乐会"], correctAnswer: "请儿子讲题" },
+                { kp: "课文理解：课文3", type: 'choice', question: "根据课文 3，小刚为什么买不到音乐会的票？", options: ["票太贵了", "听音乐会的人太多", "他忘记带钱了", "他不知道在哪儿买"], correctAnswer: "听音乐会的人太多" },
+                { kp: "课文理解：课文3", type: 'choice', question: "根据课文 3，小刚最后为什么不想去公园？", options: ["公园里人太多", "找不到那个公园", "公园太大，很累", "小丽不喜欢公园"], correctAnswer: "公园太大，很累" },
+                { kp: "课文理解：课文4", type: 'choice', question: "根据课文 4，周太太为什么让周明喝牛奶？", options: ["因为牛奶很好喝", "因为家里没咖啡了", "因为喝牛奶能睡得更好", "因为周明喜欢喝牛奶"], correctAnswer: "因为喝牛奶能睡得更好" }
+            ];
+
+            const quizData = ref([]);
+
+            const shuffleArray = (array) => {
+                for (let i = array.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [array[i], array[j]] = [array[j], array[i]];
+                }
+                return array;
+            };
+
+            const startQuiz = () => { 
+                if (studentName.value.trim()) {
+                    studentNameEntered.value = true;
+                    quizData.value = shuffleArray([...originalQuizData]);
+                } 
+            };
+
+            const quizIndex = ref(0); const quizScore = ref(0); const selectedOption = ref(null); const isAnswered = ref(false); const showQuizResult = ref(false);
+            
+            const currentQuestion = computed(() => quizData.value.length > 0 ? quizData.value[quizIndex.value] : originalQuizData[0]);
+            const quizProgress = computed(() => quizData.value.length > 0 ? (quizIndex.value / quizData.value.length) * 100 : 0);
+            const wrongKPs = computed(() => [...new Set(wrongRecords.value)]);
+
+            const selectOption = (option) => {
+                if (isAnswered.value) return;
+                selectedOption.value = option;
+                isAnswered.value = true;
+                if (option === currentQuestion.value.correctAnswer) {
+                    quizScore.value++;
+                } else {
+                    wrongRecords.value.push(currentQuestion.value.kp);
+                }
+            };
+
+            const checkInput = () => {
+                if (isAnswered.value) return;
+                isAnswered.value = true;
+                if (inputText.value.trim() === currentQuestion.value.correctAnswer) {
+                    quizScore.value++;
+                    inputResult.value = true;
+                } else {
+                    inputResult.value = false;
+                    wrongRecords.value.push(currentQuestion.value.kp);
+                }
+            };
+
+            const getOptionClass = (option) => {
+                if (!isAnswered.value) return '';
+                if (option === currentQuestion.value.correctAnswer) return 'correct';
+                if (option === selectedOption.value) return 'wrong';
+                return '';
+            };
+
+            const submitDataToServer = async () => {
+                isSubmitting.value = true;
+                const payload = {
+                    studentName: studentName.value,
+                    lesson: lessonTitle.value,
+                    score: quizScore.value,
+                    total: quizData.value.length,
+                    weakPoints: wrongKPs.value.join(" | ") 
+                };
+
+                // ★★★ 请确保这里是你刚拿到的新的 Google URL ★★★
+                const googleAppUrl = "https://script.google.com/macros/s/AKfycbxrCd6f6cQ3wocXYQZyLKY0JutolEmOWWzTGOABnnHHJOm697OfyBlkLw-SQ-u-9ZAO/exec";
+
+                try {
+                    if(googleAppUrl === "YOUR_GOOGLE_SCRIPT_WEB_APP_URL") {
+                        console.warn("未配置Google链接，仅本地展示成绩");
+                    } else {
+                        await fetch(googleAppUrl, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                            body: JSON.stringify(payload)
+                        });
+                        submitSuccess.value = true;
+                    }
+                } catch (error) {
+                    console.error("成绩上传失败", error);
+                } finally {
+                    isSubmitting.value = false;
+                    showQuizResult.value = true;
+                }
+            };
+
+            const nextQuestion = () => {
+                if (quizIndex.value < quizData.value.length - 1) { 
+                    quizIndex.value++; 
+                    selectedOption.value = null; 
+                    inputText.value = ''; 
+                    isAnswered.value = false; 
+                } else { 
+                    submitDataToServer(); 
+                }
+            };
+
+            const restartQuiz = () => { 
+                quizIndex.value = 0; quizScore.value = 0; selectedOption.value = null; inputText.value = ''; isAnswered.value = false; 
+                showQuizResult.value = false; wrongRecords.value = []; submitSuccess.value = false;
+                quizData.value = shuffleArray([...originalQuizData]);
+            };
+
+            return {
+                lessonTitle, lessonEnglishTitle, currentTab,
+                vocabData, vocabIndex, currentWord, isFlipped, toggleFlip, nextWord, prevWord, playVocabAudio,
+                showPinyin, readingData, togglePlay, playFromLine, pauseAllAudio,
+                quizData, quizIndex, currentQuestion, quizScore, isAnswered, showQuizResult, quizProgress, selectOption, getOptionClass, nextQuestion, restartQuiz,
+                studentName, studentNameEntered, startQuiz, wrongKPs, isSubmitting, submitSuccess,
+                inputText, inputResult, checkInput
+            }
+        }
+    }).mount('#app');
+</script>
+
+</body>
+</html>
