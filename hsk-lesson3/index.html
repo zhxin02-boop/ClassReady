@@ -1,0 +1,572 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Chinese ClassReady - HSK 3 预习</title>
+    <script src="https://cdn.staticfile.net/vue/3.3.4/vue.global.prod.js"></script>
+    <style>
+        body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; background-color: #f4f7f6; margin: 0; padding: 0; color: #333; padding-bottom: 70px; }
+        #app { max-width: 600px; margin: 0 auto; min-height: 100vh; background: #fff; box-shadow: 0 0 15px rgba(0,0,0,0.05); position: relative; }
+        .header { text-align: center; padding: 20px 15px 10px; background: #fff; border-bottom: 1px solid #eee; }
+        
+        .tab-bar { position: fixed; bottom: 0; left: 0; right: 0; height: 60px; background: #ffffff; display: flex; justify-content: space-around; align-items: center; box-shadow: 0 -2px 10px rgba(0,0,0,0.05); max-width: 600px; margin: 0 auto; z-index: 1000; }
+        .tab-item { display: flex; flex-direction: column; align-items: center; justify-content: center; color: #888; font-size: 12px; cursor: pointer; width: 33.33%; height: 100%; transition: color 0.3s; }
+        .tab-icon { font-size: 22px; margin-bottom: 3px; }
+        .tab-item.active { color: #4CAF50; font-weight: bold; }
+
+        .content-area { padding: 20px; }
+
+        /* ================= 生词卡片 ================= */
+        .flashcard-container { width: 100%; height: 420px; perspective: 1000px; margin-bottom: 20px; }
+        .flashcard { width: 100%; height: 100%; position: relative; transition: transform 0.6s; transform-style: preserve-3d; cursor: pointer; }
+        .flashcard.flipped { transform: rotateY(180deg); }
+        .card-face { 
+            position: absolute; width: 100%; height: 100%; 
+            backface-visibility: hidden; -webkit-backface-visibility: hidden; 
+            border-radius: 16px; box-shadow: 0 6px 16px rgba(0,0,0,0.08); 
+            display: flex; flex-direction: column; justify-content: center; align-items: center; 
+            padding: 15px 20px; box-sizing: border-box; text-align: center; 
+        }
+        .card-front { background-color: #ffffff; border: 2px solid #f0f0f0; transform: rotateY(0deg); }
+        .word-large { font-size: 48px; font-weight: bold; color: #2c3e50; margin-bottom: 15px;}
+        .click-hint { position: absolute; bottom: 15px; font-size: 13px; color: #aaa; }
+        .card-back { background-color: #e8f5e9; color: #2e7d32; transform: rotateY(180deg); }
+        .pinyin { font-size: 22px; margin-bottom: 8px; }
+        .english { font-size: 16px; font-weight: bold; margin-bottom: 15px; color: #333; }
+        .example-box { background: rgba(255,255,255,0.8); padding: 10px; border-radius: 8px; width: 100%; }
+        .example-cn { font-size: 15px; margin-bottom: 4px; color: #333;}
+        .example-py { font-size: 13px; margin-bottom: 4px; color: #666;}
+        .example-en { font-size: 12px; color: #555; font-style: italic;}
+        
+        .tts-btn { background: #e3f2fd; color: #1565c0; border: 1px solid #bbdefb; padding: 6px 16px; border-radius: 20px; font-size: 14px; cursor: pointer; font-weight: bold; transition: all 0.2s; margin-bottom: 5px; backface-visibility: hidden; -webkit-backface-visibility: hidden; }
+        .tts-btn:active { background: #bbdefb; transform: scale(0.95); }
+        .card-back .tts-btn { background: #c8e6c9; color: #2e7d32; border-color: #a5d6a7; margin-bottom: 12px;}
+
+        .controls { display: flex; justify-content: space-between; gap: 15px; }
+        .controls button { flex: 1; padding: 12px; font-size: 16px; border: none; border-radius: 8px; background-color: #4CAF50; color: white; cursor: pointer; }
+        .controls button:disabled { background-color: #ccc; cursor: not-allowed; }
+        .progress-text { text-align: center; margin-top: 15px; color: #888; font-size: 14px; }
+
+        /* ================= 课文阅读 ================= */
+        .control-panel { display: flex; justify-content: space-between; align-items: center; background: #e3f2fd; padding: 12px 15px; border-radius: 8px; margin-bottom: 25px; }
+        .switch-container { display: flex; align-items: center; gap: 10px; font-weight: bold; color: #1565c0; cursor: pointer; font-size: 14px;}
+        .switch { position: relative; display: inline-block; width: 44px; height: 24px; }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #ccc; transition: .4s; border-radius: 34px; }
+        .slider:before { position: absolute; content: ""; height: 18px; width: 18px; left: 3px; bottom: 3px; background-color: white; transition: .4s; border-radius: 50%; }
+        input:checked + .slider { background-color: #4CAF50; }
+        input:checked + .slider:before { transform: translateX(20px); }
+        
+        .scene { margin-bottom: 30px; border-left: 4px solid #4CAF50; padding-left: 15px; }
+        .scene-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
+        .scene-title { font-size: 16px; color: #4CAF50; font-weight: bold; }
+        .play-btn { background: #ff9800; color: white; border: none; padding: 6px 12px; border-radius: 20px; font-size: 12px; font-weight: bold; cursor: pointer; box-shadow: 0 2px 4px rgba(0,0,0,0.1); flex-shrink: 0;}
+        
+        .dialogue-line { display: flex; flex-direction: column; margin-bottom: 15px; padding: 12px; border-radius: 12px; background-color: #fcfcfc; transition: all 0.3s ease; cursor: pointer; border: 2px solid transparent;}
+        .dialogue-line:hover { background-color: #f5f5f5; }
+        .dialogue-line.highlight { background-color: #fff8e1; border-color: #ffb300; box-shadow: 0 4px 10px rgba(255, 179, 0, 0.15); transform: scale(1.02);}
+        
+        .speaker { align-self: flex-start; background: #e0f2f1; color: #2e7d32; padding: 4px 10px; border-radius: 6px; font-size: 12px; font-weight: bold; margin-bottom: 8px; }
+        .text-content { display: flex; flex-direction: column; gap: 4px; margin-bottom: 5px; }
+        .pinyin-line { font-size: 15px; color: #777; line-height: 1.4; word-break: break-word; }
+        .chinese-line { font-size: 18px; color: #222; line-height: 1.5; word-break: break-word; }
+        .english-translation { font-size: 14px; color: #999; margin-top: 6px; font-style: italic; border-top: 1px dashed #eee; padding-top: 8px; word-break: break-word;}
+
+        /* ================= 测验 ================= */
+        .quiz-progress-bar { width: 100%; height: 6px; background: #e0e0e0; border-radius: 3px; margin-bottom: 20px; overflow: hidden; }
+        .quiz-progress-fill { height: 100%; background: #4CAF50; transition: width 0.3s ease; }
+        .question-type { font-size: 12px; color: #1976d2; font-weight: bold; margin-bottom: 10px; }
+        .question-text { font-size: 18px; font-weight: bold; margin-bottom: 20px; line-height: 1.4; }
+        .options-container { display: flex; flex-direction: column; gap: 10px; }
+        .option-btn { background: #f8f9fa; border: 2px solid #e9ecef; padding: 14px; border-radius: 10px; font-size: 15px; cursor: pointer; text-align: left; transition: all 0.2s; word-break: break-word;}
+        .option-btn.correct { background: #e8f5e9; border-color: #4CAF50; color: #2e7d32; font-weight: bold; }
+        .option-btn.wrong { background: #ffebee; border-color: #f44336; color: #c62828; text-decoration: line-through; }
+        .action-area { margin-top: 25px; text-align: center; min-height: 45px; }
+        .next-btn { background: #1976d2; color: white; border: none; padding: 12px 30px; font-size: 16px; border-radius: 8px; cursor: pointer; width: 100%; }
+        
+        .result-screen { text-align: center; padding: 20px 0; }
+        .score { font-size: 60px; font-weight: bold; color: #4CAF50; margin: 10px 0; }
+        .restart-btn { background: #ff9800; color: white; border: none; padding: 12px 30px; font-size: 16px; border-radius: 8px; cursor: pointer; width: 100%; margin-top: 20px;}
+        .name-input-container { text-align: center; padding: 40px 20px; }
+        .name-input { width: 100%; padding: 15px; font-size: 18px; border: 2px solid #e0e0e0; border-radius: 8px; margin-bottom: 20px; text-align: center; box-sizing: border-box; }
+        .name-input:focus { border-color: #4CAF50; outline: none; }
+        .weak-points-box { background: #ffebee; padding: 15px; border-radius: 8px; margin: 20px 0; text-align: left; }
+        .typing-input { width: 100%; padding: 15px; font-size: 20px; border: 2px solid #e0e0e0; border-radius: 8px; box-sizing: border-box; text-align: center; letter-spacing: 2px; }
+        .typing-input:focus { border-color: #1976d2; outline: none; box-shadow: 0 0 5px rgba(25,118,210,0.3); }
+        .check-btn { margin-top: 15px; width: 100%; padding: 12px; background: #ff9800; color: white; border: none; border-radius: 8px; font-size: 16px; cursor: pointer; font-weight: bold; }
+        .check-btn:disabled { background: #ccc; cursor: not-allowed; }
+        .input-feedback { margin-top: 15px; font-size: 16px; font-weight: bold; padding: 10px; border-radius: 8px;}
+        .input-correct { background-color: #e8f5e9; color: #2e7d32; border: 1px solid #4CAF50; }
+        .input-wrong { background-color: #ffebee; color: #c62828; border: 1px solid #f44336; }
+    </style>
+</head>
+<body>
+
+<div id="app">
+    <div class="header">
+        <h2 style="color: #4CAF50; font-weight: 900; letter-spacing: 1px;">Chinese ClassReady 🚀</h2>
+        <h3 style="margin: 10px 0 5px 0; font-size: 18px; color: #333;">{{ lessonTitle }}</h3>
+        <p style="margin: 0; color: #888; font-size: 13px;">{{ lessonEnglishTitle }}</p>
+    </div>
+
+    <div class="content-area">
+        <div v-show="currentTab === 'vocab'">
+            <div class="flashcard-container" @click="toggleFlip">
+                <div class="flashcard" :class="{ flipped: isFlipped }">
+                    <div class="card-face card-front">
+                        <div class="word-large">{{ currentWord.word }}</div>
+                        <button class="tts-btn" @click.stop="playVocabAudio(currentWord.word)">🔊 听读音</button>
+                        <div class="click-hint">点击空白处翻转 (Tap card to flip)</div>
+                    </div>
+                    <div class="card-face card-back">
+                        <button class="tts-btn" @click.stop="playVocabAudio(currentWord.word)">🔊 听读音</button>
+                        <div class="pinyin">{{ currentWord.pinyin }}</div>
+                        <div class="english">{{ currentWord.english }}</div>
+                        <div class="example-box">
+                            <div class="example-cn">{{ currentWord.example.chinese }}</div>
+                            <div class="example-py">{{ currentWord.example.pinyin }}</div>
+                            <div class="example-en">{{ currentWord.example.english }}</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="controls">
+                <button @click="prevWord" :disabled="vocabIndex === 0">上一个 (Prev)</button>
+                <button @click="nextWord" :disabled="vocabIndex === vocabData.length - 1">下一个 (Next)</button>
+            </div>
+            <div class="progress-text">{{ vocabIndex + 1 }} / {{ vocabData.length }}</div>
+        </div>
+
+        <div v-show="currentTab === 'read'">
+            <div class="control-panel">
+                <label class="switch-container">
+                    <div class="switch">
+                        <input type="checkbox" v-model="showPinyin">
+                        <span class="slider"></span>
+                    </div>
+                    <span>{{ showPinyin ? '隐藏拼音 (Hide)' : '显示拼音 (Show)' }}</span>
+                </label>
+                <span style="font-size: 12px; color: #888;">💡 点击句子直接播放</span>
+            </div>
+            
+            <div class="scene" v-for="scene in readingData" :key="scene.textId">
+                <div class="scene-header">
+                    <div class="scene-title">{{ scene.context }}</div>
+                    <button class="play-btn" @click="togglePlay(scene)">
+                        {{ scene.isPlaying ? '⏸ 暂停 (Pause)' : '▶ 播放 (Play)' }}
+                    </button>
+                </div>
+                <div class="dialogue-line" 
+                     v-for="(line, index) in scene.dialogue" :key="index"
+                     :class="{ 'highlight': scene.activeIndex === index }"
+                     @click="playFromLine(scene, line.startTime)">
+                    <div class="speaker">{{ line.speaker }}</div>
+                    <div class="text-content">
+                        <div class="pinyin-line" v-show="showPinyin">{{ line.pinyin }}</div>
+                        <div class="chinese-line">{{ line.chinese }}</div>
+                    </div>
+                    <div class="english-translation">{{ line.english }}</div>
+                </div>
+            </div>
+        </div>
+
+        <div v-show="currentTab === 'quiz'">
+            <div v-if="!studentNameEntered" class="name-input-container">
+                <h3 style="color: #1976d2; margin-bottom: 10px;">Who are you?</h3>
+                <p style="color: #888; font-size: 14px; margin-bottom: 25px;">Please enter your name to start the quiz</p>
+                <input v-model="studentName" type="text" class="name-input" placeholder="Your Name" />
+                <button @click="startQuiz" :disabled="!studentName.trim()" class="next-btn" style="background-color: #4CAF50;">开始测验 (Start)</button>
+            </div>
+
+            <div v-else-if="!showQuizResult">
+                <div class="quiz-progress-bar">
+                    <div class="quiz-progress-fill" :style="{ width: quizProgress + '%' }"></div>
+                </div>
+                <div class="question-type">
+                    <span v-if="currentQuestion.type === 'choice' && currentQuestion.kp.includes('课文理解')">📖 课文理解 (Reading Comprehension)</span>
+                    <span v-else-if="currentQuestion.type === 'choice'">📝 选择题 (Multiple Choice)</span>
+                    <span v-else-if="currentQuestion.type === 'fill'">👆 选词填空 (Fill in the blank)</span>
+                    <span v-else>✍️ 拼写输入 (Type in Chinese)</span>
+                </div>
+                <div class="question-text" v-html="currentQuestion.question"></div>
+                
+                <div class="options-container" v-if="currentQuestion.type === 'choice' || currentQuestion.type === 'fill'">
+                    <button 
+                        v-for="(option, index) in currentQuestion.options" :key="index"
+                        class="option-btn" :class="getOptionClass(option)"
+                        :disabled="isAnswered" @click="selectOption(option)">
+                        {{ option }}
+                    </button>
+                </div>
+
+                <div class="input-container" v-else-if="currentQuestion.type === 'input'">
+                    <input type="text" v-model="inputText" :disabled="isAnswered" placeholder="Please type in Chinese" class="typing-input" />
+                    <button v-if="!isAnswered" @click="checkInput" class="check-btn" :disabled="!inputText.trim()">提交答案 (Submit)</button>
+                    <div v-if="isAnswered" class="input-feedback" :class="{'input-correct': inputResult, 'input-wrong': !inputResult}">
+                        {{ inputResult ? '✅ 回答正确！(Correct)' : '❌ 错误。正确答案是 (Answer): ' + currentQuestion.correctAnswer }}
+                    </div>
+                </div>
+
+                <div class="action-area">
+                    <button class="next-btn" v-show="isAnswered" @click="nextQuestion">
+                        {{ quizIndex === quizData.length - 1 ? '查看成绩并提交 (Submit)' : '下一题 (Next)' }}
+                    </button>
+                </div>
+            </div>
+
+            <div v-else class="result-screen">
+                <h2>🎉 Quiz Completed, {{ studentName }}!</h2>
+                <div class="score">{{ quizScore }} / {{ quizData.length }}</div>
+                
+                <div v-if="wrongKPs.length > 0" class="weak-points-box">
+                    <p style="color: #c62828; font-weight: bold; margin-top: 0;">需要复习的知识点 (Needs Review):</p>
+                    <ul style="color: #d32f2f; font-size: 14px; padding-left: 20px; margin-bottom: 0;">
+                        <li v-for="kp in wrongKPs" :key="kp" style="margin-bottom: 5px;">{{ kp }}</li>
+                    </ul>
+                </div>
+                <div v-else style="color: #4CAF50; font-weight: bold; margin: 20px 0; font-size: 18px;">
+                    Perfect! 满分通过！
+                </div>
+
+                <div v-if="isSubmitting" style="color: #ff9800; font-size: 13px; margin-bottom: 20px; font-weight: bold;">
+                    ⏳ 正在将成绩发送给老师... (Submitting...)
+                </div>
+                <div v-else-if="submitSuccess" style="color: #4CAF50; font-size: 13px; margin-bottom: 20px; font-weight: bold;">
+                    ✅ 成绩已成功发送给老师 (Score submitted)
+                </div>
+                <div v-else style="color: #f44336; font-size: 13px; margin-bottom: 20px; font-weight: bold;">
+                    ❌ 成绩发送失败，可能是网络问题 (Failed to submit)
+                </div>
+
+                <button class="restart-btn" @click="restartQuiz">再测一次 (Try Again)</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="tab-bar">
+        <div class="tab-item" :class="{ active: currentTab === 'vocab' }" @click="currentTab = 'vocab'">
+            <div class="tab-icon">📖</div><span>生词 Vocab</span>
+        </div>
+        <div class="tab-item" :class="{ active: currentTab === 'read' }" @click="pauseAllAudio(); currentTab = 'read'">
+            <div class="tab-icon">🎧</div><span>课文 Read</span>
+        </div>
+        <div class="tab-item" :class="{ active: currentTab === 'quiz' }" @click="currentTab = 'quiz'">
+            <div class="tab-icon">📝</div><span>小测 Quiz</span>
+        </div>
+    </div>
+</div>
+
+<script>
+    const { createApp, ref, computed } = Vue;
+
+    createApp({
+        setup() {
+            // 第3课 基本信息
+            const lessonTitle = ref("第 3 课：桌子上放着很多饮料");
+            const lessonEnglishTitle = ref("There are plenty of drinks on the table");
+            const currentTab = ref('vocab'); 
+
+            // 生词提取 (HSK 3 L3)
+            const vocabData = ref([
+                { word: "还是", pinyin: "háishi", english: "or", example: { chinese: "你要喝咖啡还是喝茶？", pinyin: "Nǐ yào hē kāfēi háishi hē chá?", english: "Do you want coffee or tea?" } },
+                { word: "爬山", pinyin: "pá shān", english: "to climb a mountain", example: { chinese: "我们明天要去爬山。", pinyin: "Wǒmen míngtiān yào qù pá shān.", english: "We are going to climb a mountain tomorrow." } },
+                { word: "小心", pinyin: "xiǎoxīn", english: "careful", example: { chinese: "爬山的时候要小心点儿。", pinyin: "Pá shān de shíhou yào xiǎoxīn diǎnr.", english: "Be a little careful when climbing the mountain." } },
+                { word: "条", pinyin: "tiáo", english: "measure word for pants, dresses, etc.", example: { chinese: "我已经有两条这样的裤子了。", pinyin: "Wǒ yǐjīng yǒu liǎng tiáo zhèyàng de kùzi le.", english: "I already have two pairs of pants like this." } },
+                { word: "裤子", pinyin: "kùzi", english: "pants", example: { chinese: "你觉得这条裤子怎么样？", pinyin: "Nǐ juéde zhè tiáo kùzi zěnmeyàng?", english: "What do you think of these pants?" } },
+                { word: "记得", pinyin: "jìde", english: "to remember", example: { chinese: "我记得你已经有两条了。", pinyin: "Wǒ jìde nǐ yǐjīng yǒu liǎng tiáo le.", english: "I remember you already have two pairs." } },
+                { word: "衬衫", pinyin: "chènshān", english: "shirt", example: { chinese: "这件衬衫怎么样？", pinyin: "Zhè jiàn chènshān zěnmeyàng?", english: "How about this shirt?" } },
+                { word: "元", pinyin: "yuán", english: "unit of money", example: { chinese: "这上面写着320元。", pinyin: "Zhè shàngmian xiězhe sān bǎi èrshí yuán.", english: "It says 320 yuan on it." } },
+                { word: "新鲜", pinyin: "xīnxiān", english: "fresh", example: { chinese: "这些水果真新鲜。", pinyin: "Zhèxiē shuǐguǒ zhēn xīnxiān.", english: "These fruits are really fresh." } },
+                { word: "甜", pinyin: "tián", english: "sweet", example: { chinese: "这个西瓜很甜。", pinyin: "Zhège xīguā hěn tián.", english: "This watermelon is very sweet." } },
+                { word: "只", pinyin: "zhǐ", english: "only, solely", example: { chinese: "今天晚上我只吃水果不吃饭。", pinyin: "Jīntiān wǎnshang wǒ zhǐ chī shuǐguǒ bù chī fàn.", english: "Tonight I only eat fruit and no meal." } },
+                { word: "放", pinyin: "fàng", english: "to put, to place", example: { chinese: "桌子上放着很多饮料。", pinyin: "Zhuōzi shang fàngzhe hěn duō yǐnliào.", english: "There are many drinks placed on the table." } },
+                { word: "饮料", pinyin: "yǐnliào", english: "drink, beverage", example: { chinese: "你要喝什么饮料？", pinyin: "Nǐ yào hē shénme yǐnliào?", english: "What beverage do you want to drink?" } },
+                { word: "或者", pinyin: "huòzhě", english: "or", example: { chinese: "茶或者咖啡都可以。", pinyin: "Chá huòzhě kāfēi dōu kěyǐ.", english: "Tea or coffee are both fine." } },
+                { word: "舒服", pinyin: "shūfu", english: "comfortable", example: { chinese: "喝杯热茶会很舒服。", pinyin: "Hē bēi rè chá huì hěn shūfu.", english: "Drinking a cup of hot tea will be very comfortable." } },
+                { word: "花", pinyin: "huā", english: "flower", example: { chinese: "她喜欢喝花茶。", pinyin: "Tā xǐhuan hē huāchá.", english: "She likes to drink flower tea." } },
+                { word: "绿", pinyin: "lǜ", english: "green", example: { chinese: "绿茶很好喝。", pinyin: "Lǜchá hěn hǎo hē.", english: "Green tea is very good to drink." } }
+            ]);
+
+            const vocabIndex = ref(0);
+            const isFlipped = ref(false);
+            const currentWord = computed(() => vocabData.value[vocabIndex.value]);
+            const toggleFlip = () => isFlipped.value = !isFlipped.value;
+            const nextWord = () => { if (vocabIndex.value < vocabData.value.length - 1) { isFlipped.value = false; setTimeout(() => vocabIndex.value++, 150); } };
+            const prevWord = () => { if (vocabIndex.value > 0) { isFlipped.value = false; setTimeout(() => vocabIndex.value--, 150); } };
+
+            const playVocabAudio = (text) => {
+                if ('speechSynthesis' in window) {
+                    window.speechSynthesis.cancel();
+                    const utterance = new SpeechSynthesisUtterance(text);
+                    utterance.lang = 'zh-CN'; 
+                    utterance.rate = 0.85;    
+                    window.speechSynthesis.speak(utterance);
+                } else {
+                    alert("您的浏览器不支持语音合成功能。");
+                }
+            };
+
+            const showPinyin = ref(true);
+            
+            // 课文对齐 (KTV逐句时间轴设定 - 根据录音预估设定时间点)
+            const readingData = ref([
+                {
+                    textId: 1, context: "在小丽家 / At Xiaoli's home", audioSrc: "audio/text1.mp3", activeIndex: -1, isPlaying: false, audioObj: null, textStartTime: 25, textEndTime: 46,
+                    dialogue: [
+                        { speaker: "小刚", chinese: "明天是晴天还是阴天？", pinyin: "Míngtiān shì qíngtiān háishì yīntiān?", english: "Is tomorrow sunny or cloudy?" },
+                        { speaker: "小丽", chinese: "阴天，电视上说多云。怎么了？有事？", pinyin: "Yīntiān, diànshì shang shuō duōyún. Zěnme le? Yǒu shì?", english: "Cloudy, TV says it will be cloudy. What's wrong? Anything the matter?" },
+                        { speaker: "小刚", chinese: "没事，我们明天要去爬山。", pinyin: "Méi shì, wǒmen míngtiān yào qù pá shān.", english: "Nothing, we are going to climb a mountain tomorrow." },
+                        { speaker: "小丽", chinese: "爬山的时候要小心点儿。", pinyin: "Pá shān de shíhou yào xiǎoxīn diǎnr.", english: "Be a little careful when climbing." },
+                        { speaker: "小刚", chinese: "好，你也去吗？", pinyin: "Hǎo, nǐ yě qù ma?", english: "Okay, are you going too?" },
+                        { speaker: "小丽", chinese: "我不去，我有事。", pinyin: "Wǒ bú qù, wǒ yǒu shì.", english: "I'm not going, I have things to do." }
+                    ]
+                },
+                {
+                    textId: 2, context: "在商场 / In a mall", audioSrc: "audio/text2.mp3", activeIndex: -1, isPlaying: false, audioObj: null, textStartTime: 9, textEndTime: 34,
+                    dialogue: [
+                        { speaker: "周太太", chinese: "你觉得这条裤子怎么样？", pinyin: "Nǐ juéde zhè tiáo kùzi zěnmeyàng?", english: "What do you think of these pants?" },
+                        { speaker: "周明", chinese: "我记得你已经有两条这样的裤子了。", pinyin: "Wǒ jìde nǐ yǐjīng yǒu liǎng tiáo zhèyàng de kùzi le.", english: "I remember you already have two pairs of pants like this." },
+                        { speaker: "周太太", chinese: "那我们再看看别的。", pinyin: "Nà wǒmen zài kànkan biéde.", english: "Then let's look at something else." },
+                        { speaker: "周明", chinese: "这件衬衫怎么样？", pinyin: "Zhè jiàn chènshān zěnmeyàng?", english: "How about this shirt?" },
+                        { speaker: "周太太", chinese: "还不错，多少钱？", pinyin: "Hái búcuò, duōshao qián?", english: "Not bad, how much is it?" },
+                        { speaker: "周明", chinese: "这上面写着320元。", pinyin: "Zhè shàngmian xiězhe sān bǎi èrshí yuán.", english: "It says 320 yuan on it." },
+                        { speaker: "周太太", chinese: "买一件。", pinyin: "Mǎi yí jiàn.", english: "I'll buy one." }
+                    ]
+                },
+                {
+                    textId: 3, context: "在水果店 / At a fruit store", audioSrc: "audio/text3.mp3", activeIndex: -1, isPlaying: false, audioObj: null, textStartTime: 11, textEndTime: 37,
+                    dialogue: [
+                        { speaker: "周太太", chinese: "这些水果真新鲜，我们买西瓜还是苹果？", pinyin: "Zhèxiē shuǐguǒ zhēn xīnxiān, wǒmen mǎi xīguā háishi píngguǒ?", english: "These fruits are so fresh, should we buy watermelon or apples?" },
+                        { speaker: "周明", chinese: "西瓜吧。你看，这上面写着“西瓜不甜不要钱”。", pinyin: "Xīguā ba. Nǐ kàn, zhè shàngmian xiězhe 'xīguā bù tián bú yào qián'.", english: "Watermelon. Look, it says 'no money if the watermelon is not sweet' here." },
+                        { speaker: "周太太", chinese: "那我们买一个大点儿的吧。", pinyin: "Nà wǒmen mǎi yí ge dà diǎnr de ba.", english: "Then let's buy a bigger one." },
+                        { speaker: "周明", chinese: "再买几个苹果。", pinyin: "Zài mǎi jǐ ge píngguǒ.", english: "Buy a few apples too." },
+                        { speaker: "周太太", chinese: "好啊，今天晚上只吃水果不吃饭！", pinyin: "Hǎo a, jīntiān wǎnshang zhǐ chī shuǐguǒ bù chī fàn!", english: "Okay, tonight we will only eat fruit and no meal!" }
+                    ]
+                },
+                {
+                    textId: 4, context: "在休息室 / In the lounge", audioSrc: "audio/text4.mp3", activeIndex: -1, isPlaying: false, audioObj: null, textStartTime: 10, textEndTime: 38,
+                    dialogue: [
+                        { speaker: "小丽", chinese: "桌子上放着很多饮料，你喝什么？", pinyin: "Zhuōzi shang fàngzhe hěn duō yǐnliào, nǐ hē shénme?", english: "There are plenty of drinks on the table, what do you want to drink?" },
+                        { speaker: "小刚", chinese: "茶或者咖啡都可以。你呢？你喝什么？", pinyin: "Chá huòzhě kāfēi dōu kěyǐ. Nǐ ne? Nǐ hē shénme?", english: "Tea or coffee is fine. How about you? What do you want to drink?" },
+                        { speaker: "小丽", chinese: "我喝茶，茶是我的最爱。天冷了或者工作累了的时候，喝杯热茶会很舒服。", pinyin: "Wǒ hē chá, chá shì wǒ de zuì ài. Tiān lěngle huòzhě gōngzuò lèile de shíhou, hē bēi rè chá huì hěn shūfu.", english: "I drink tea, tea is my favorite. When it's cold or when tired from work, a cup of hot tea is very comfortable." },
+                        { speaker: "小刚", chinese: "你喜欢喝什么茶？", pinyin: "Nǐ xǐhuan hē shénme chá?", english: "What tea do you like to drink?" },
+                        { speaker: "小丽", chinese: "花茶、绿茶、红茶，我都喜欢。", pinyin: "Huāchá, lǜchá, hóngchá, wǒ dōu xǐhuan.", english: "Flower tea, green tea, black tea, I like them all." }
+                    ]
+                }
+            ]);
+
+            readingData.value.forEach(scene => {
+                const totalDuration = scene.textEndTime - scene.textStartTime;
+                const totalChars = scene.dialogue.reduce((sum, line) => sum + line.chinese.length, 0);
+                let currentStartTime = scene.textStartTime;
+                scene.dialogue.forEach(line => {
+                    const lineDuration = totalDuration * (line.chinese.length / totalChars);
+                    line.startTime = currentStartTime;
+                    line.endTime = currentStartTime + lineDuration;
+                    currentStartTime += lineDuration; 
+                });
+            });
+
+            const pauseAllAudio = () => {
+                readingData.value.forEach(scene => {
+                    if(scene.audioObj) { scene.audioObj.pause(); scene.isPlaying = false; scene.activeIndex = -1; }
+                });
+                if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+            };
+
+            const togglePlay = (scene) => {
+                readingData.value.forEach(s => {
+                    if(s.textId !== scene.textId && s.audioObj) { s.audioObj.pause(); s.isPlaying = false; s.activeIndex = -1; }
+                });
+
+                if (!scene.audioObj) {
+                    scene.audioObj = new Audio(scene.audioSrc);
+                    scene.audioObj.addEventListener('timeupdate', () => {
+                        const ct = scene.audioObj.currentTime;
+                        if (ct < scene.textStartTime || ct > scene.textEndTime) { scene.activeIndex = -1; } 
+                        else { const idx = scene.dialogue.findIndex(l => ct >= l.startTime && ct < l.endTime); scene.activeIndex = idx; }
+                    });
+                    scene.audioObj.addEventListener('ended', () => { scene.activeIndex = -1; scene.isPlaying = false; });
+                }
+                
+                if (scene.isPlaying) { scene.audioObj.pause(); scene.isPlaying = false; } 
+                else { scene.audioObj.currentTime = scene.textStartTime; scene.audioObj.play().catch(e => { console.error("音频播放失败", e); }); scene.isPlaying = true; }
+            };
+
+            const playFromLine = (scene, startTime) => {
+                readingData.value.forEach(s => {
+                    if(s.textId !== scene.textId && s.audioObj) { s.audioObj.pause(); s.isPlaying = false; s.activeIndex = -1; }
+                });
+
+                if (!scene.audioObj) {
+                    scene.audioObj = new Audio(scene.audioSrc);
+                    scene.audioObj.addEventListener('timeupdate', () => {
+                        const ct = scene.audioObj.currentTime;
+                        if (ct < scene.textStartTime || ct > scene.textEndTime) { scene.activeIndex = -1; } 
+                        else { const idx = scene.dialogue.findIndex(l => ct >= l.startTime && ct < l.endTime); scene.activeIndex = idx; }
+                    });
+                    scene.audioObj.addEventListener('ended', () => { scene.activeIndex = -1; scene.isPlaying = false; });
+                }
+                scene.audioObj.currentTime = startTime; 
+                scene.audioObj.play().catch(e => { console.error(e); });
+                scene.isPlaying = true;
+            };
+
+            const studentName = ref('');
+            const studentNameEntered = ref(false);
+            const wrongRecords = ref([]);
+            const isSubmitting = ref(false);
+            const submitSuccess = ref(false);
+            
+            const inputText = ref('');
+            const inputResult = ref(false);
+
+            // 测验数据 (25道)
+            const originalQuizData = [
+                // 词汇选择题 (8)
+                { kp: "词汇：还是", type: 'choice', question: "What is the correct meaning for '还是' (háishi)?", options: ["Always", "Or (in a question)", "Only", "And"], correctAnswer: "Or (in a question)" },
+                { kp: "词汇：爬山", type: 'choice', question: "Which word means 'To climb a mountain'?", options: ["爬山 (pá shān)", "比赛 (bǐsài)", "小心 (xiǎoxīn)", "记得 (jìde)"], correctAnswer: "爬山 (pá shān)" },
+                { kp: "词汇：舒服", type: 'choice', question: "What is the correct meaning for '舒服' (shūfu)?", options: ["Fresh", "Sweet", "Comfortable", "Careful"], correctAnswer: "Comfortable" },
+                { kp: "词汇：新鲜", type: 'choice', question: "Which word means 'Fresh'?", options: ["新鲜 (xīnxiān)", "甜 (tián)", "舒服 (shūfu)", "或者 (huòzhě)"], correctAnswer: "新鲜 (xīnxiān)" },
+                { kp: "词汇：衬衫", type: 'choice', question: "What is the correct meaning for '衬衫' (chènshān)?", options: ["Pants", "Dress", "Shirt", "Shoes"], correctAnswer: "Shirt" },
+                { kp: "词汇：小心", type: 'choice', question: "Which word means 'Careful'?", options: ["记得 (jìde)", "小心 (xiǎoxīn)", "舒服 (shūfu)", "甜 (tián)"], correctAnswer: "小心 (xiǎoxīn)" },
+                { kp: "词汇：饮料", type: 'choice', question: "What is the correct meaning for '饮料' (yǐnliào)?", options: ["Fruit", "Cake", "Drink / Beverage", "Flower"], correctAnswer: "Drink / Beverage" },
+                { kp: "词汇：记得", type: 'choice', question: "Which word means 'To remember'?", options: ["记得 (jìde)", "放 (fàng)", "去 (qù)", "或者 (huòzhě)"], correctAnswer: "记得 (jìde)" },
+                
+                // 填空题 (8)
+                { kp: "语法：或者 / 还是", type: 'fill', question: "你要喝咖啡___喝茶？", options: ["还是", "或者", "和"], correctAnswer: "还是" },
+                { kp: "语法：或者 / 还是", type: 'fill', question: "今天晚上吃米饭___面条都可以。", options: ["还是", "或者", "和"], correctAnswer: "或者" },
+                { kp: "语法：存在的表达(放着)", type: 'fill', question: "桌子上___很多饮料。", options: ["放着", "拿着", "写着"], correctAnswer: "放着" },
+                { kp: "量词：条", type: 'fill', question: "我已经有两___这样的裤子了。", options: ["件", "本", "条"], correctAnswer: "条" },
+                { kp: "语法：存在的表达(写着)", type: 'fill', question: "这上面___320元。", options: ["写着", "放着", "站着"], correctAnswer: "写着" },
+                { kp: "词汇用法：只", type: 'fill', question: "今天晚上我___吃水果不吃饭。", options: ["还", "只", "又"], correctAnswer: "只" },
+                { kp: "量词：件", type: 'fill', question: "这___衬衫怎么样？", options: ["条", "个", "件"], correctAnswer: "件" },
+                { kp: "词汇用法：甜", type: 'fill', question: "这个西瓜不___不要钱。", options: ["新鲜", "甜", "大"], correctAnswer: "甜" },
+                
+                // 拼写输入 (4)
+                { kp: "拼写：饮料", type: 'input', question: "Please type the Chinese characters for <b>'drink/beverage'</b>:", correctAnswer: "饮料" },
+                { kp: "拼写：甜", type: 'input', question: "Please type the Chinese character for <b>'sweet'</b>:", correctAnswer: "甜" },
+                { kp: "拼写：绿", type: 'input', question: "Please type the Chinese character for <b>'green'</b>:", correctAnswer: "绿" },
+                { kp: "拼写：花", type: 'input', question: "Please type the Chinese character for <b>'flower'</b>:", correctAnswer: "花" },
+
+                // 课文理解 (5)
+                { kp: "课文理解：课文1", type: 'choice', question: "根据课文 1，小丽明天要去爬山吗？", options: ["要去，她很喜欢爬山", "不去，她明天有事", "不知道", "要去，因为天气很好"], correctAnswer: "不去，她明天有事" },
+                { kp: "课文理解：课文2", type: 'choice', question: "根据课文 2，周太太最后买了什么？", options: ["一条裤子", "两件衬衫", "一件衬衫", "什么都没买"], correctAnswer: "一件衬衫" },
+                { kp: "课文理解：课文3", type: 'choice', question: "根据课文 3，那个西瓜有什么特点？", options: ["很不新鲜", "很贵", "不甜不要钱", "太大不能买"], correctAnswer: "不甜不要钱" },
+                { kp: "课文理解：课文3", type: 'choice', question: "根据课文 3，周太太今天晚上打算吃什么？", options: ["只吃饭不吃水果", "只吃水果不吃饭", "吃苹果和米饭", "什么都不吃"], correctAnswer: "只吃水果不吃饭" },
+                { kp: "课文理解：课文4", type: 'choice', question: "根据课文 4，天冷或者工作累的时候，小丽喜欢做什么？", options: ["喝杯热茶", "喝杯冰水", "去爬山", "去买衬衫"], correctAnswer: "喝杯热茶" }
+            ];
+
+            const quizData = ref([]);
+
+            const shuffleArray = (array) => {
+                for (let i = array.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [array[i], array[j]] = [array[j], array[i]];
+                }
+                return array;
+            };
+
+            const startQuiz = () => { 
+                if (studentName.value.trim()) {
+                    studentNameEntered.value = true;
+                    quizData.value = shuffleArray([...originalQuizData]);
+                } 
+            };
+
+            const quizIndex = ref(0); const quizScore = ref(0); const selectedOption = ref(null); const isAnswered = ref(false); const showQuizResult = ref(false);
+            
+            const currentQuestion = computed(() => quizData.value.length > 0 ? quizData.value[quizIndex.value] : originalQuizData[0]);
+            const quizProgress = computed(() => quizData.value.length > 0 ? (quizIndex.value / quizData.value.length) * 100 : 0);
+            const wrongKPs = computed(() => [...new Set(wrongRecords.value)]);
+
+            const selectOption = (option) => {
+                if (isAnswered.value) return;
+                selectedOption.value = option;
+                isAnswered.value = true;
+                if (option === currentQuestion.value.correctAnswer) {
+                    quizScore.value++;
+                } else {
+                    wrongRecords.value.push(currentQuestion.value.kp);
+                }
+            };
+
+            const checkInput = () => {
+                if (isAnswered.value) return;
+                isAnswered.value = true;
+                if (inputText.value.trim() === currentQuestion.value.correctAnswer) {
+                    quizScore.value++;
+                    inputResult.value = true;
+                } else {
+                    inputResult.value = false;
+                    wrongRecords.value.push(currentQuestion.value.kp);
+                }
+            };
+
+            const getOptionClass = (option) => {
+                if (!isAnswered.value) return '';
+                if (option === currentQuestion.value.correctAnswer) return 'correct';
+                if (option === selectedOption.value) return 'wrong';
+                return '';
+            };
+
+            const submitDataToServer = () => {
+                showQuizResult.value = true; 
+                isSubmitting.value = true;
+                submitSuccess.value = false;
+
+                const formData = new URLSearchParams();
+                formData.append('studentName', studentName.value);
+                formData.append('lesson', lessonTitle.value);
+                formData.append('score', quizScore.value);
+                formData.append('total', quizData.value.length);
+                formData.append('weakPoints', wrongKPs.value.join(" | ") || "全对");
+
+                const googleAppUrl = "https://script.google.com/macros/s/AKfycbxrCd6f6cQ3wocXYQZyLKY0JutolEmOWWzTGOABnnHHJOm697OfyBlkLw-SQ-u-9ZAO/exec";
+
+                fetch(googleAppUrl, {
+                    method: 'POST',
+                    mode: 'no-cors',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: formData.toString()
+                }).then(() => {
+                    submitSuccess.value = true;
+                }).catch(error => {
+                    console.error("成绩上传失败", error);
+                }).finally(() => {
+                    isSubmitting.value = false;
+                });
+            };
+
+            const nextQuestion = () => {
+                if (quizIndex.value < quizData.value.length - 1) { 
+                    quizIndex.value++; 
+                    selectedOption.value = null; 
+                    inputText.value = ''; 
+                    isAnswered.value = false; 
+                } else { 
+                    submitDataToServer(); 
+                }
+            };
+
+            const restartQuiz = () => { 
+                quizIndex.value = 0; quizScore.value = 0; selectedOption.value = null; inputText.value = ''; isAnswered.value = false; 
+                showQuizResult.value = false; wrongRecords.value = []; submitSuccess.value = false;
+                quizData.value = shuffleArray([...originalQuizData]);
+            };
+
+            return {
+                lessonTitle, lessonEnglishTitle, currentTab,
+                vocabData, vocabIndex, currentWord, isFlipped, toggleFlip, nextWord, prevWord, playVocabAudio,
+                showPinyin, readingData, togglePlay, playFromLine, pauseAllAudio,
+                quizData, quizIndex, currentQuestion, quizScore, isAnswered, showQuizResult, quizProgress, selectOption, getOptionClass, nextQuestion, restartQuiz,
+                studentName, studentNameEntered, startQuiz, wrongKPs, isSubmitting, submitSuccess,
+                inputText, inputResult, checkInput
+            }
+        }
+    }).mount('#app');
+</script>
+
+</body>
+</html>
