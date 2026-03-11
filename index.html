@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ClassReady 课件总库</title>
+    <script src="https://cdn.staticfile.net/vue/3.3.4/vue.global.prod.js"></script>
+    <style>
+        body { font-family: 'PingFang SC', 'Helvetica Neue', Arial, sans-serif; background-color: #f4f7f6; margin: 0; padding: 40px 20px; color: #333; text-align: center; }
+        #app { max-width: 600px; margin: 0 auto; background: #fff; border-radius: 20px; padding: 40px 30px; box-shadow: 0 10px 30px rgba(0,0,0,0.05); }
+        h1 { color: #10b981; font-weight: 900; letter-spacing: 1px; margin-bottom: 10px; font-size: 28px;}
+        p { color: #6b7280; font-size: 15px; margin-bottom: 35px; }
+        .lesson-list { display: flex; flex-direction: column; gap: 16px; }
+        
+        /* 基础卡片样式 */
+        .lesson-card { display: flex; justify-content: space-between; align-items: center; padding: 18px 25px; border-radius: 15px; text-decoration: none; font-size: 18px; transition: all 0.3s; text-align: left; }
+        .lesson-title { display: flex; align-items: center; gap: 10px; }
+        .icon { font-size: 20px; transition: 0.2s; }
+
+        /* 状态 1：已上传（点亮） */
+        .active-card { background: #f8fafc; border: 2px solid #e2e8f0; color: #1e293b; font-weight: bold; cursor: pointer; }
+        .active-card:hover { background: #eff6ff; border-color: #3b82f6; transform: translateY(-3px); box-shadow: 0 6px 15px rgba(59, 130, 246, 0.15); color: #2563eb; }
+        .active-card .icon { color: #94a3b8; }
+        .active-card:hover .icon { color: #3b82f6; transform: translateX(5px); }
+
+        /* 状态 2：未上传（灰色锁定） */
+        .locked-card { background: #f1f5f9; border: 2px dashed #cbd5e1; color: #94a3b8; cursor: not-allowed; opacity: 0.7; }
+        .locked-card .icon { color: #cbd5e1; }
+
+        /* 状态 3：探测中（加载动画） */
+        .loading-card { background: #f8fafc; border: 2px solid #f1f5f9; color: #cbd5e1; opacity: 0.5; animation: pulse 1.5s infinite; pointer-events: none;}
+        @keyframes pulse { 0% { opacity: 0.5; } 50% { opacity: 0.8; } 100% { opacity: 0.5; } }
+    </style>
+</head>
+<body>
+    <div id="app">
+        <h1>Chinese ClassReady 🚀</h1>
+        <p>欢迎来到预习课件库！请选择你要学习的课程：</p>
+
+        <div class="lesson-list">
+            <a v-for="lesson in lessons" :key="lesson.num" 
+               :href="lesson.status === 'active' ? `./hsk3-lesson${lesson.num}/index.html` : null"
+               class="lesson-card"
+               :class="{
+                   'active-card': lesson.status === 'active',
+                   'locked-card': lesson.status === 'locked',
+                   'loading-card': lesson.status === 'loading'
+               }"
+               @click="handleLockedClick($event, lesson.status)">
+                
+                <div class="lesson-title">
+                    <span>📖</span> 第 {{ lesson.num }} 课 (HSK 3)
+                </div>
+                
+                <span class="icon">{{ lesson.status === 'active' ? '➔' : (lesson.status === 'locked' ? '🔒' : '...') }}</span>
+            </a>
+        </div>
+    </div>
+
+   <script>
+        const { createApp, ref, onMounted } = Vue;
+
+        createApp({
+            setup() {
+                const lessons = ref(Array.from({ length: 20 }, (_, i) => ({
+                    num: i + 1,
+                    status: 'loading' 
+                })));
+
+                const checkLessonExists = async (lesson) => {
+                    const url = `./hsk3-lesson${lesson.num}/index.html`;
+                    try {
+                        // 优化点 1：去掉了强制不缓存，让浏览器记住已经解锁的课，越用越快！
+                        const response = await fetch(url, { method: 'HEAD' });
+                        if (response.ok) {
+                            lesson.status = 'active'; 
+                        } else {
+                            lesson.status = 'locked'; 
+                        }
+                    } catch (error) {
+                        lesson.status = 'locked'; 
+                    }
+                };
+
+                // 优化点 2：错峰巡逻算法（每隔 50 毫秒敲一个门，绝不阻塞你的点击！）
+                const patrolLessons = async () => {
+                    for (let i = 0; i < lessons.value.length; i++) {
+                        checkLessonExists(lessons.value[i]);
+                        await new Promise(resolve => setTimeout(resolve, 50)); 
+                    }
+                };
+
+                onMounted(() => {
+                    patrolLessons(); // 启动错峰巡逻
+                });
+
+                const handleLockedClick = (e, status) => {
+                    if (status === 'locked') {
+                        e.preventDefault(); 
+                        alert("敬请期待！👩‍🏫");
+                    }
+                };
+
+                return {
+                    lessons,
+                    handleLockedClick
+                }
+            }
+        }).mount('#app');
+    </script>
