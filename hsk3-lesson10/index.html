@@ -1,0 +1,822 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Chinese ClassReady - 第10课预习</title>
+    <script src="https://cdn.staticfile.net/vue/3.3.4/vue.global.prod.js"></script>
+    <style>
+        body { font-family: 'PingFang SC', 'Helvetica Neue', Helvetica, Arial, sans-serif; background-color: #f4f7f6; margin: 0; padding: 0; color: #333; padding-bottom: 70px; }
+        #app { max-width: 600px; margin: 0 auto; min-height: 100vh; background: #fff; box-shadow: 0 0 15px rgba(0,0,0,0.05); position: relative; }
+        .header { text-align: center; padding: 20px 15px 10px; background: #fff; border-bottom: 1px solid #eee; }
+        
+        .tab-bar { position: fixed; bottom: 0; left: 0; right: 0; height: 60px; background: #ffffff; display: flex; justify-content: space-around; align-items: center; box-shadow: 0 -2px 10px rgba(0,0,0,0.05); max-width: 600px; margin: 0 auto; z-index: 1000; padding-bottom: env(safe-area-inset-bottom); }
+        .tab-item { display: flex; flex-direction: column; align-items: center; justify-content: center; color: #888; font-size: 12px; cursor: pointer; width: 33.33%; height: 100%; transition: color 0.3s; }
+        .tab-icon { font-size: 22px; margin-bottom: 3px; }
+        .tab-item.active { color: #4CAF50; font-weight: bold; }
+
+        .content-area { padding: 20px; }
+
+        /* ================= 生词模块 (全新美化排版) ================= */
+        .flashcard-container { width: 100%; height: 260px; perspective: 1000px; margin-bottom: 20px; }
+        .flashcard { width: 100%; height: 100%; position: relative; transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1); transform-style: preserve-3d; cursor: pointer; }
+        .flashcard.flipped { transform: rotateY(180deg); }
+        .card-face { 
+            position: absolute; width: 100%; height: 100%; 
+            backface-visibility: hidden; -webkit-backface-visibility: hidden; 
+            border-radius: 16px; box-shadow: 0 8px 20px rgba(0,0,0,0.06); 
+            display: flex; flex-direction: column; justify-content: center; align-items: center; 
+            padding: 15px 20px; box-sizing: border-box; text-align: center; 
+        }
+        .card-front { background-color: #ffffff; border: 2px solid #f8f9fa; transform: rotateY(0deg); }
+        .word-large { font-size: 52px; font-weight: 800; color: #2c3e50; margin-bottom: 15px; letter-spacing: 2px;}
+        .click-hint { position: absolute; bottom: 15px; font-size: 13px; color: #bbb; }
+        .card-back { background-color: #f0fdf4; color: #166534; transform: rotateY(180deg); border: 2px solid #bbf7d0;}
+        .pinyin { font-size: 26px; margin-bottom: 8px; font-weight: bold; font-family: 'Arial', sans-serif;}
+        .english { font-size: 18px; font-weight: 600; margin-bottom: 15px; color: #374151; }
+        
+        .tts-btn { background: #e0f2fe; color: #0369a1; border: none; padding: 8px 20px; border-radius: 20px; font-size: 14px; cursor: pointer; font-weight: bold; transition: all 0.2s; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+        .tts-btn:active { transform: scale(0.95); }
+        .card-back .tts-btn { background: #dcfce7; color: #166534; }
+
+        /* 扩展与例句 (去拼音版) */
+        .vocab-extra { background: #ffffff; border-radius: 16px; padding: 20px; margin-bottom: 20px; box-shadow: 0 4px 12px rgba(0,0,0,0.03); border: 1px solid #f3f4f6; }
+        .section-title { font-size: 15px; font-weight: 800; color: #374151; margin-bottom: 12px; display: flex; align-items: center; gap: 6px; }
+        
+        .collocation-box { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 20px; justify-content: center;}
+        .collocation-tag { background: #fff7ed; color: #c2410c; padding: 6px 14px; border-radius: 20px; font-size: 14px; font-weight: bold; border: 1px solid #ffedd5; }
+        
+        .example-list { padding: 0; margin: 0; list-style: none; }
+        .example-list li { margin-bottom: 15px; background: #f9fafb; padding: 12px; border-radius: 10px; border-left: 4px solid #3b82f6; }
+        .ex-cn { font-size: 16px; color: #1f2937; font-weight: 500; margin-bottom: 4px; display: flex; justify-content: space-between; align-items: center;}
+        .ex-en { font-size: 13px; color: #6b7280; font-style: italic; }
+
+        /* 翻译造句挑战 */
+        .translation-practice { background: #eff6ff; border-radius: 16px; padding: 20px; text-align: center; border: 2px solid #bfdbfe;}
+        .trans-prompt { font-size: 16px; color: #1e3a8a; font-weight: bold; margin-bottom: 15px; line-height: 1.4;}
+        .practice-input { width: 100%; padding: 14px; font-size: 16px; border: 2px solid #93c5fd; border-radius: 10px; box-sizing: border-box; text-align: center; margin-bottom: 12px; transition: 0.3s;}
+        .practice-input:focus { outline: none; border-color: #3b82f6; box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2); }
+        .practice-submit { background: #3b82f6; color: white; width: 100%; border: none; padding: 14px; border-radius: 10px; font-size: 16px; font-weight: bold; cursor: pointer; box-shadow: 0 4px 6px rgba(59, 130, 246, 0.2); transition: 0.2s;}
+        .practice-submit:active { transform: translateY(2px); }
+        .practice-msg { margin-top: 12px; font-weight: bold; font-size: 15px; padding: 10px; border-radius: 8px;}
+        .msg-success { background: #dcfce7; color: #166534; }
+        .msg-error { background: #fee2e2; color: #991b1b; }
+
+        .controls { display: flex; justify-content: space-between; gap: 15px; margin-top: 20px;}
+        .controls button { flex: 1; padding: 14px; font-size: 16px; border: none; border-radius: 12px; background-color: #10b981; color: white; cursor: pointer; font-weight: bold; box-shadow: 0 4px 6px rgba(16, 185, 129, 0.2); transition: 0.2s;}
+        .controls button:disabled { background-color: #d1d5db; box-shadow: none; cursor: not-allowed; }
+        .progress-text { text-align: center; margin-top: 15px; color: #9ca3af; font-size: 14px; font-weight: bold; letter-spacing: 1px;}
+
+        /* ================= 课文阅读 ================= */
+        .control-panel { display: flex; justify-content: space-between; align-items: center; background: #f3f4f6; padding: 15px; border-radius: 12px; margin-bottom: 20px; flex-wrap: wrap; gap: 10px; border: 1px solid #e5e7eb;}
+        .switch-container { display: flex; align-items: center; gap: 8px; font-weight: bold; color: #4b5563; cursor: pointer; font-size: 14px;}
+        .switch { position: relative; display: inline-block; width: 42px; height: 24px; }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #d1d5db; transition: .4s; border-radius: 34px; }
+        .slider:before { position: absolute; content: ""; height: 18px; width: 18px; left: 3px; bottom: 3px; background-color: white; transition: .4s; border-radius: 50%; }
+        input:checked + .slider { background-color: #10b981; }
+        input:checked + .slider:before { transform: translateX(18px); }
+        input.cloze-chk:checked + .slider { background-color: #f59e0b; }
+        
+        .scene { margin-bottom: 35px; border-left: 5px solid #10b981; padding-left: 15px; }
+        .scene-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
+        .scene-title { font-size: 16px; color: #059669; font-weight: 800; }
+        .play-btn { background: #f59e0b; color: white; border: none; padding: 8px 16px; border-radius: 20px; font-size: 13px; font-weight: bold; cursor: pointer; box-shadow: 0 2px 4px rgba(245, 158, 11, 0.2); }
+        
+        .dialogue-line { display: flex; flex-direction: column; margin-bottom: 15px; padding: 15px; border-radius: 12px; background-color: #ffffff; transition: all 0.3s ease; cursor: pointer; border: 2px solid transparent; box-shadow: 0 2px 8px rgba(0,0,0,0.02);}
+        .dialogue-line.highlight { background-color: #fffbeb; border-color: #fbbf24; transform: scale(1.02); box-shadow: 0 4px 12px rgba(251, 191, 36, 0.15);}
+        .dialogue-line.marked-bg { background-color: #fef2f2; border-right: 4px solid #ef4444; }
+        
+        .speaker-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;}
+        .speaker { background: #d1fae5; color: #047857; padding: 4px 12px; border-radius: 8px; font-size: 13px; font-weight: 800; }
+        .mark-btn { background: #f3f4f6; border: none; color: #6b7280; border-radius: 12px; padding: 5px 12px; font-size: 12px; cursor: pointer; font-weight: bold; transition: 0.2s;}
+        .mark-btn.marked { background: #ef4444; color: white; box-shadow: 0 2px 5px rgba(239, 68, 68, 0.3);}
+        
+        .text-content { display: flex; flex-direction: column; gap: 4px; margin-bottom: 8px; }
+        .pinyin-line { font-size: 15px; color: #6b7280; line-height: 1.4; word-break: break-word; font-family: 'Arial', sans-serif;}
+        .chinese-line { font-size: 19px; color: #111827; line-height: 1.5; word-break: break-word; font-weight: 500;}
+        .new-word { color: #2563eb; font-weight: bold; background: #eff6ff; padding: 0 4px; border-radius: 4px;}
+        .cloze-blank { display: inline-block; width: 45px; border-bottom: 3px solid #cbd5e1; margin: 0 5px; vertical-align: bottom;}
+        .english-translation { font-size: 14px; color: #9ca3af; font-style: italic; border-top: 1px dashed #e5e7eb; padding-top: 10px; word-break: break-word;}
+
+        /* ================= 测验 ================= */
+        .quiz-progress-bar { width: 100%; height: 8px; background: #e5e7eb; border-radius: 4px; margin-bottom: 25px; overflow: hidden; }
+        .quiz-progress-fill { height: 100%; background: #3b82f6; transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1); }
+        .question-type { font-size: 13px; color: #d97706; font-weight: 800; margin-bottom: 12px; background: #fef3c7; display: inline-block; padding: 6px 12px; border-radius: 8px;}
+        .question-text { font-size: 19px; font-weight: bold; margin-bottom: 25px; line-height: 1.5; color: #1f2937;}
+        
+        .options-container { display: flex; flex-direction: column; gap: 12px; }
+        .option-btn { background: #ffffff; border: 2px solid #e5e7eb; padding: 16px; border-radius: 12px; font-size: 16px; cursor: pointer; text-align: left; transition: all 0.2s; word-break: break-word; font-weight: 500; color: #374151;}
+        .option-btn.correct { background: #dcfce7; border-color: #10b981; color: #166534; font-weight: bold; }
+        .option-btn.wrong { background: #fee2e2; border-color: #ef4444; color: #991b1b; text-decoration: line-through; }
+        
+        /* 连词成句游戏 UI */
+        .order-drop-zone { min-height: 60px; border: 2px dashed #94a3b8; border-radius: 12px; padding: 12px; margin-bottom: 20px; display: flex; flex-wrap: wrap; gap: 10px; background: #f8fafc;}
+        .order-word-bank { display: flex; flex-wrap: wrap; gap: 10px; min-height: 60px;}
+        .order-word { background: white; border: 2px solid #3b82f6; color: #2563eb; padding: 10px 18px; border-radius: 10px; font-size: 17px; font-weight: bold; cursor: pointer; box-shadow: 0 4px 6px rgba(59, 130, 246, 0.1); user-select: none; transition: 0.2s;}
+        .order-word:active { transform: scale(0.95); }
+        .order-word.selected { background: #3b82f6; color: white; }
+        
+        .action-area { margin-top: 30px; text-align: center; min-height: 45px; }
+        .next-btn { background: #3b82f6; color: white; border: none; padding: 16px 30px; font-size: 18px; border-radius: 12px; cursor: pointer; width: 100%; font-weight: bold; box-shadow: 0 4px 10px rgba(59, 130, 246, 0.3);}
+        
+        .result-screen { text-align: center; padding: 30px 0; }
+        .score { font-size: 72px; font-weight: 900; color: #10b981; margin: 15px 0; font-family: 'Arial', sans-serif;}
+        .name-input-container { text-align: center; padding: 40px 20px; }
+        .name-input { width: 100%; padding: 16px; font-size: 18px; border: 2px solid #d1d5db; border-radius: 12px; margin-bottom: 25px; text-align: center; box-sizing: border-box; font-weight: bold;}
+        .name-input:focus { border-color: #10b981; outline: none; }
+        
+        .typing-input { width: 100%; padding: 16px; font-size: 22px; border: 2px solid #d1d5db; border-radius: 12px; box-sizing: border-box; text-align: center; letter-spacing: 2px; }
+        .typing-input:focus { border-color: #3b82f6; outline: none; box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2); }
+        .check-btn { margin-top: 15px; width: 100%; padding: 14px; background: #f59e0b; color: white; border: none; border-radius: 10px; font-size: 18px; cursor: pointer; font-weight: bold; box-shadow: 0 4px 6px rgba(245, 158, 11, 0.2);}
+        
+        /* Toast 弹窗 */
+        .toast { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); background: #1f2937; color: white; padding: 12px 24px; border-radius: 30px; font-size: 14px; font-weight: bold; box-shadow: 0 10px 25px rgba(0,0,0,0.2); z-index: 9999; opacity: 0; transition: opacity 0.3s; pointer-events: none; }
+        .toast.show { opacity: 1; }
+    </style>
+</head>
+<body>
+
+<div id="app">
+    <div class="header">
+        <h2 style="color: #10b981; font-weight: 900; letter-spacing: 1px; margin:0 0 5px 0;">Chinese ClassReady 🚀</h2>
+        <h3 style="margin: 5px 0 5px 0; font-size: 18px; color: #111827;">{{ lessonTitle }}</h3>
+        <p style="margin: 0; color: #6b7280; font-size: 13px; font-weight: 500;">{{ lessonEnglishTitle }}</p>
+    </div>
+
+    <div class="toast" :class="{ show: toastVisible }">{{ toastMsg }}</div>
+
+    <div class="content-area">
+        <div v-show="currentTab === 'vocab'">
+            <div class="flashcard-container" @click="toggleFlip">
+                <div class="flashcard" :class="{ flipped: isFlipped }">
+                    <div class="card-face card-front">
+                        <div class="word-large">{{ currentWord.word }}</div>
+                        <button class="tts-btn" @click.stop="playVocabAudio(currentWord.word)">🔊 听读音 (Listen)</button>
+                        <div class="click-hint">点击卡片翻转 (Tap card to flip)</div>
+                    </div>
+                    <div class="card-face card-back">
+                        <div class="pinyin">{{ currentWord.pinyin }}</div>
+                        <div class="english">{{ currentWord.english }}</div>
+                        <button class="tts-btn" @click.stop="playVocabAudio(currentWord.word)">🔊 听读音</button>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="vocab-extra">
+                <div class="section-title">🔗 常用搭配 (Collocations)</div>
+                <div class="collocation-box">
+                    <span class="collocation-tag" v-for="(coll, i) in currentWord.collocations" :key="i">{{ coll }}</span>
+                </div>
+                
+                <div class="section-title">📝 进阶例句 (Context Examples)</div>
+                <ul class="example-list">
+                    <li v-for="(ex, idx) in currentWord.examples" :key="idx">
+                        <div class="ex-cn">
+                            <span>{{ ex.chinese }}</span>
+                            <span @click="playVocabAudio(ex.chinese)" style="cursor:pointer; font-size:18px;">🔊</span>
+                        </div>
+                        <div class="ex-en">{{ ex.english }}</div>
+                    </li>
+                </ul>
+            </div>
+
+            <div class="translation-practice">
+                <div class="section-title" style="margin-top:0; justify-content:center;">✍️ 翻译练习 (Translation Practice)</div>
+                <p class="trans-prompt">"{{ currentWord.practice.english }}"</p>
+                <input v-model="vocabInput" type="text" class="practice-input" placeholder="Type Chinese translation here..." @keyup.enter="checkTranslation">
+                <button class="practice-submit" @click="checkTranslation">提交 (Check Answer)</button>
+                <div v-if="vocabFeedback" :class="['practice-msg', vocabFeedbackType]">{{ vocabFeedback }}</div>
+            </div>
+
+            <div class="controls">
+                <button @click="prevWord" :disabled="vocabIndex === 0">◀ 上一个 (Prev)</button>
+                <button @click="nextWord" :disabled="vocabIndex === vocabData.length - 1">下一个 (Next) ▶</button>
+            </div>
+            <div class="progress-text">{{ vocabIndex + 1 }} / {{ vocabData.length }}</div>
+        </div>
+
+        <div v-show="currentTab === 'read'">
+            <div class="control-panel">
+                <label class="switch-container">
+                    <div class="switch">
+                        <input type="checkbox" v-model="showPinyin">
+                        <span class="slider"></span>
+                    </div>
+                    <span>{{ showPinyin ? '隐藏拼音 (Hide)' : '显示拼音 (Show)' }}</span>
+                </label>
+                <label class="switch-container">
+                    <div class="switch">
+                        <input type="checkbox" v-model="isClozeMode" class="cloze-chk">
+                        <span class="slider"></span>
+                    </div>
+                    <span style="color:#d97706">🎭 挖空模式 (Cloze)</span>
+                </label>
+            </div>
+            <p style="font-size: 13px; color: #6b7280; text-align:center; margin-top:0; font-weight:500;">💡 点击句子播放录音。遇到不懂的句子可以点击右侧的 ❔ 标记发给老师。</p>
+            
+            <div class="scene" v-for="scene in readingData" :key="scene.textId">
+                <div class="scene-header">
+                    <div class="scene-title">{{ scene.context }}</div>
+                    <button class="play-btn" @click="togglePlay(scene)">
+                        {{ scene.isPlaying ? '⏸ 暂停 (Pause)' : '▶ 播放 (Play)' }}
+                    </button>
+                </div>
+                <div class="dialogue-line" 
+                     v-for="(line, index) in scene.dialogue" :key="index"
+                     :class="{ 'highlight': scene.activeIndex === index, 'marked-bg': line.isMarked }"
+                     @click="playFromLine(scene, line.startTime)">
+                    <div class="speaker-row">
+                        <div class="speaker">{{ line.speaker }}</div>
+                        <button class="mark-btn" :class="{ marked: line.isMarked }" @click.stop="toggleMark(line)">
+                            {{ line.isMarked ? '❓ 已发给老师 (Notified)' : '❔ 标记不懂 (Need Help)' }}
+                        </button>
+                    </div>
+                    <div class="text-content">
+                        <div class="pinyin-line" v-show="showPinyin">{{ line.pinyin }}</div>
+                        <div class="chinese-line" v-html="isClozeMode ? line.cloze : line.chinese"></div>
+                    </div>
+                    <div class="english-translation">{{ line.english }}</div>
+                </div>
+            </div>
+        </div>
+
+        <div v-show="currentTab === 'quiz'">
+            <div v-if="!studentNameEntered" class="name-input-container">
+                <h3 style="color: #2563eb; margin-bottom: 10px;">Who are you?</h3>
+                <p style="color: #6b7280; font-size: 15px; margin-bottom: 25px;">Please enter your name to start the challenge (25 Questions)</p>
+                <input v-model="studentName" type="text" class="name-input" placeholder="Your Name" />
+                <button @click="startQuiz" :disabled="!studentName.trim()" class="next-btn" style="background-color: #10b981;">开始挑战 (Start)</button>
+            </div>
+
+            <div v-else-if="!showQuizResult">
+                <div class="quiz-progress-bar">
+                    <div class="quiz-progress-fill" :style="{ width: quizProgress + '%' }"></div>
+                </div>
+                <div style="display:flex; justify-content: space-between; align-items:center;">
+                    <div class="question-type">
+                        <span v-if="currentQuestion.type === 'order'">🧩 连词成句 (Sentence Ordering)</span>
+                        <span v-else-if="currentQuestion.type === 'choice' && currentQuestion.kp.includes('课文')">📖 课文理解 (Reading Comprehension)</span>
+                        <span v-else-if="currentQuestion.type === 'choice'">📝 选择题 (Multiple Choice)</span>
+                        <span v-else-if="currentQuestion.type === 'fill'">👆 选词填空 (Fill in the blank)</span>
+                        <span v-else>✍️ 拼写输入 (Type in Chinese)</span>
+                    </div>
+                    <span style="color:#9ca3af; font-size:14px; font-weight:bold;">{{ quizIndex + 1 }} / 25</span>
+                </div>
+                
+                <div class="question-text" v-html="currentQuestion.question"></div>
+                
+                <div class="options-container" v-if="currentQuestion.type === 'choice' || currentQuestion.type === 'fill'">
+                    <button 
+                        v-for="(option, index) in currentQuestion.options" :key="index"
+                        class="option-btn" :class="getOptionClass(option)"
+                        :disabled="isAnswered" @click="selectOption(option)">
+                        {{ option }}
+                    </button>
+                </div>
+
+                <div class="input-container" v-else-if="currentQuestion.type === 'input'">
+                    <input type="text" v-model="inputText" :disabled="isAnswered" placeholder="Please type in Chinese" class="typing-input" />
+                    <button v-if="!isAnswered" @click="checkInput" class="check-btn" :disabled="!inputText.trim()">提交答案 (Submit)</button>
+                    <div v-if="isAnswered" class="input-feedback" :class="{'input-correct': inputResult, 'input-wrong': !inputResult}">
+                        {{ inputResult ? '✅ 回答正确！(Correct)' : '❌ 错误。正确答案是: ' + currentQuestion.correctAnswer }}
+                    </div>
+                </div>
+
+                <div class="order-container" v-else-if="currentQuestion.type === 'order'">
+                    <div class="order-drop-zone">
+                        <span v-for="item in orderAnswer" :key="item.id" class="order-word selected" @click="!isAnswered && removeFromOrder(item)">
+                            {{ item.text }}
+                        </span>
+                    </div>
+                    <div class="order-word-bank">
+                        <span v-for="item in orderBank" :key="item.id" class="order-word" @click="!isAnswered && addToOrder(item)">
+                            {{ item.text }}
+                        </span>
+                    </div>
+                    <button v-if="!isAnswered" @click="checkOrder" class="check-btn" :disabled="orderBank.length > 0">验证句子 (Verify)</button>
+                    <div v-if="isAnswered" class="input-feedback" :class="{'input-correct': inputResult, 'input-wrong': !inputResult}">
+                        {{ inputResult ? '✅ 完美！(Perfect!)' : '❌ 顺序不对哦。正确句子是: ' + currentQuestion.correctAnswer }}
+                    </div>
+                </div>
+
+                <div class="action-area">
+                    <button class="next-btn" v-show="isAnswered" @click="nextQuestion">
+                        {{ quizIndex === quizData.length - 1 ? '查看成绩单 (Submit Report)' : '下一题 (Next)' }}
+                    </button>
+                </div>
+            </div>
+
+            <div v-else class="result-screen">
+                <h2>🎉 Challenge Completed, {{ studentName }}!</h2>
+                <div class="score">{{ quizScore }} / {{ quizData.length }}</div>
+                
+                <div v-if="wrongKPs.length > 0" class="weak-points-box">
+                    <p style="color: #b91c1c; font-weight: 800; margin-top: 0; font-size:16px;">🎯 专属你的知识盲区 (Needs Review):</p>
+                    <ul style="color: #dc2626; font-size: 15px; padding-left: 20px; margin-bottom: 0; font-weight:500;">
+                        <li v-for="kp in wrongKPs" :key="kp" style="margin-bottom: 6px;">{{ kp }}</li>
+                    </ul>
+                </div>
+                <div v-else style="color: #10b981; font-weight: 800; margin: 20px 0; font-size: 20px;">
+                    🏆 Perfect! 无懈可击的满分！
+                </div>
+
+                <div v-if="isSubmitting" style="color: #d97706; font-size: 14px; margin-bottom: 20px; font-weight: bold;">
+                    ⏳ 正在将学习报告发送给老师...
+                </div>
+                <div v-else-if="submitSuccess" style="color: #10b981; font-size: 14px; margin-bottom: 20px; font-weight: bold;">
+                    ✅ 报告已成功同步给老师！
+                </div>
+                <div v-else style="color: #ef4444; font-size: 14px; margin-bottom: 20px; font-weight: bold;">
+                    ❌ 发送失败，可能是网络问题。
+                </div>
+
+                <button class="restart-btn" @click="restartQuiz" style="background:#f59e0b;">再玩一次 (Try Again)</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="tab-bar">
+        <div class="tab-item" :class="{ active: currentTab === 'vocab' }" @click="currentTab = 'vocab'">
+            <div class="tab-icon">📖</div><span>生词 Vocab</span>
+        </div>
+        <div class="tab-item" :class="{ active: currentTab === 'read' }" @click="pauseAllAudio(); currentTab = 'read'">
+            <div class="tab-icon">🎧</div><span>课文 Read</span>
+        </div>
+        <div class="tab-item" :class="{ active: currentTab === 'quiz' }" @click="currentTab = 'quiz'">
+            <div class="tab-icon">🎮</div><span>挑战 Quiz</span>
+        </div>
+    </div>
+</div>
+
+<script>
+    const { createApp, ref, computed, watch } = Vue;
+
+    // Google Apps Script URL
+    const googleAppUrl = "https://script.google.com/macros/s/AKfycbxrCd6f6cQ3wocXYQZyLKY0JutolEmOWWzTGOABnnHHJOm697OfyBlkLw-SQ-u-9ZAO/exec";
+
+    createApp({
+        setup() {
+            // 第10课 基本信息
+            const lessonTitle = ref("第 10 课：数学比历史难多了");
+            const lessonEnglishTitle = ref("Math is much harder than history");
+            const currentTab = ref('vocab'); 
+
+            // Toast 提示逻辑
+            const toastVisible = ref(false);
+            const toastMsg = ref('');
+            let toastTimer = null;
+            const showToast = (msg) => {
+                toastMsg.value = msg;
+                toastVisible.value = true;
+                if(toastTimer) clearTimeout(toastTimer);
+                toastTimer = setTimeout(() => { toastVisible.value = false; }, 3000);
+            };
+
+            // 生词库 
+            const vocabData = ref([
+                { word: "个子", pinyin: "gèzi", english: "height, stature", collocations: ["个子高", "个子矮", "长个子"], practice: { english: "Marco is taller than me.", answer: "马可比我个子高。" }, examples: [
+                    { chinese: "大山，你和马可谁个子高？", english: "Dashan, who is taller, you or Marco?" },
+                    { chinese: "我哥哥个子很高。", english: "My older brother is very tall." },
+                    { chinese: "他今年长个子了。", english: "He grew taller this year." }
+                ]},
+                { word: "矮", pinyin: "ǎi", english: "short (of stature)", collocations: ["比较矮", "很矮", "矮一点儿"], practice: { english: "I am a little shorter than Marco.", answer: "我比马可矮一点儿。" }, examples: [
+                    { chinese: "我比马可矮一点儿。", english: "I am a little shorter than Marco." },
+                    { chinese: "他比我矮。", english: "He is shorter than me." },
+                    { chinese: "这个桌子有点儿矮。", english: "This table is a bit short." }
+                ]},
+                { word: "历史", pinyin: "lìshǐ", english: "history", collocations: ["历史课", "中国历史", "历史很长"], practice: { english: "I like history class.", answer: "我喜欢历史课。" }, examples: [
+                    { chinese: "我喜欢历史课。", english: "I like history class." },
+                    { chinese: "中国有很长的历史。", english: "China has a very long history." },
+                    { chinese: "我对历史很感兴趣。", english: "I am very interested in history." }
+                ]},
+                { word: "体育", pinyin: "tǐyù", english: "P.E., sports", collocations: ["体育课", "体育老师", "体育馆"], practice: { english: "I like PE class.", answer: "我喜欢体育课。" }, examples: [
+                    { chinese: "我喜欢历史课、体育课。", english: "I like history class and PE class." },
+                    { chinese: "今天下午有体育课。", english: "There is a PE class this afternoon." },
+                    { chinese: "他是我们的体育老师。", english: "He is our PE teacher." }
+                ]},
+                { word: "数学", pinyin: "shùxué", english: "mathematics", collocations: ["数学课", "数学题", "数学老师"], practice: { english: "Math is much harder than history.", answer: "数学比历史难多了。" }, examples: [
+                    { chinese: "我觉得数学比历史难多了。", english: "I think math is much harder than history." },
+                    { chinese: "我不喜欢数学课。", english: "I don't like math class." },
+                    { chinese: "这道数学题很难。", english: "This math problem is very difficult." }
+                ]},
+                { word: "方便", pinyin: "fāngbiàn", english: "convenient", collocations: ["很方便", "不方便", "方便面"], practice: { english: "That's very convenient.", answer: "那很方便啊。" }, examples: [
+                    { chinese: "走路二十分钟就到，那很方便啊。", english: "It takes 20 minutes to walk there, that's very convenient." },
+                    { chinese: "学校里边比学校外边方便。", english: "Inside the school is more convenient than outside." },
+                    { chinese: "这里买东西很方便。", english: "It is very convenient to buy things here." }
+                ]},
+                { word: "自行车", pinyin: "zìxíngchē", english: "bicycle", collocations: ["骑自行车", "买自行车", "一辆自行车"], practice: { english: "I plan to buy a bicycle.", answer: "我打算买辆自行车。" }, examples: [
+                    { chinese: "我还打算买辆自行车。", english: "I also plan to buy a bicycle." },
+                    { chinese: "这是我的新自行车。", english: "This is my new bicycle." },
+                    { chinese: "你每天骑自行车去学校吗？", english: "Do you ride a bicycle to school every day?" }
+                ]},
+                { word: "骑", pinyin: "qí", english: "to ride", collocations: ["骑车", "骑马", "骑自行车"], practice: { english: "It takes 7 or 8 minutes by bike.", answer: "骑车七八分钟就能到。" }, examples: [
+                    { chinese: "骑车七八分钟就能到。", english: "It takes only 7 or 8 minutes by riding." },
+                    { chinese: "我喜欢骑马。", english: "I like riding horses." },
+                    { chinese: "你会骑自行车吗？", english: "Can you ride a bicycle?" }
+                ]},
+                { word: "旧", pinyin: "jiù", english: "old, used", collocations: ["太旧了", "旧衣服", "旧书"], practice: { english: "That bike is too old.", answer: "那辆太旧了。" }, examples: [
+                    { chinese: "那辆太旧了，要换一辆。", english: "That one is too old, I need to change for a new one." },
+                    { chinese: "这件衣服有点儿旧了。", english: "This piece of clothing is a bit old." },
+                    { chinese: "不要扔掉旧书。", english: "Don't throw away old books." }
+                ]},
+                { word: "换", pinyin: "huàn", english: "to change, to substitute", collocations: ["换一辆", "换钱", "换衣服"], practice: { english: "I want to change to a new one.", answer: "我要换一辆新的。" }, examples: [
+                    { chinese: "那辆太旧了，要换一辆。", english: "That one is too old, I need to change for a new one." },
+                    { chinese: "请等一下，我要换衣服。", english: "Please wait a moment, I need to change clothes." },
+                    { chinese: "我去银行换钱。", english: "I am going to the bank to exchange money." }
+                ]},
+                { word: "地方", pinyin: "dìfang", english: "place", collocations: ["这个地方", "别的地方", "好地方"], practice: { english: "Are the houses in these two places the same?", answer: "这两个地方的房子一样吗？" }, examples: [
+                    { chinese: "这两个地方的房子一样吗？", english: "Are the houses in these two places the same?" },
+                    { chinese: "北京是个很好的地方。", english: "Beijing is a very good place." },
+                    { chinese: "你想去什么地方玩儿？", english: "What place do you want to visit for fun?" }
+                ]},
+                { word: "中介", pinyin: "zhōngjiè", english: "agent, intermediary", collocations: ["找中介", "房屋中介", "中介公司"], practice: { english: "The agent said they are different.", answer: "中介说不一样。" }, examples: [
+                    { chinese: "中介带小丽看房子。", english: "The agent takes Xiaoli to see houses." },
+                    { chinese: "我明天要去见中介。", english: "I am going to meet the agent tomorrow." },
+                    { chinese: "这个中介公司很好。", english: "This agency is very good." }
+                ]},
+                { word: "主要", pinyin: "zhǔyào", english: "main, mainly", collocations: ["主要是", "主要问题", "主要原因"], practice: { english: "The main thing is the environment.", answer: "主要是环境。" }, examples: [
+                    { chinese: "大小没关系，主要是环境。", english: "Size doesn't matter, the main thing is the environment." },
+                    { chinese: "这个问题主要是我做错的。", english: "This problem was mainly my mistake." },
+                    { chinese: "他主要学习汉语。", english: "He mainly studies Chinese." }
+                ]},
+                { word: "环境", pinyin: "huánjìng", english: "environment", collocations: ["环境很好", "保护环境", "工作环境"], practice: { english: "Which environment is quieter?", answer: "哪个环境更安静？" }, examples: [
+                    { chinese: "主要是环境，哪个更安静？", english: "The main thing is the environment, which one is quieter?" },
+                    { chinese: "这里的工作环境很好。", english: "The working environment here is very good." },
+                    { chinese: "我们要保护环境。", english: "We must protect the environment." }
+                ]},
+                { word: "附近", pinyin: "fùjìn", english: "nearby, vicinity", collocations: ["学校附近", "附近有", "住在附近"], practice: { english: "There are 3 or 4 stations nearby.", answer: "附近有三四个车站。" }, examples: [
+                    { chinese: "学校里边比学校外边方便，附近有三四个车站。", english: "Inside the school is more convenient than outside, there are three or four stations nearby." },
+                    { chinese: "我家附近有一个超市。", english: "There is a supermarket near my house." },
+                    { chinese: "我就住在附近。", english: "I live right nearby." }
+                ]}
+            ]);
+
+            const vocabIndex = ref(0);
+            const isFlipped = ref(false);
+            const currentWord = computed(() => vocabData.value[vocabIndex.value]);
+            const toggleFlip = () => isFlipped.value = !isFlipped.value;
+            const nextWord = () => { if (vocabIndex.value < vocabData.value.length - 1) { isFlipped.value = false; setTimeout(() => vocabIndex.value++, 150); } };
+            const prevWord = () => { if (vocabIndex.value > 0) { isFlipped.value = false; setTimeout(() => vocabIndex.value--, 150); } };
+
+            const playVocabAudio = (text) => {
+                if ('speechSynthesis' in window) {
+                    window.speechSynthesis.cancel();
+                    const utterance = new SpeechSynthesisUtterance(text);
+                    utterance.lang = 'zh-CN'; 
+                    utterance.rate = 0.85;    
+                    window.speechSynthesis.speak(utterance);
+                }
+            };
+
+            // 翻译造句逻辑
+            const vocabInput = ref('');
+            const vocabFeedback = ref('');
+            const vocabFeedbackType = ref('');
+
+            const normalizeText = (text) => text.replace(/[。，？！,.?!]/g, '').replace(/\s+/g, '');
+
+            const checkTranslation = () => {
+                const userText = normalizeText(vocabInput.value);
+                const targetText = normalizeText(currentWord.value.practice.answer);
+                const wordCore = currentWord.value.word; 
+
+                if (userText === targetText) {
+                    vocabFeedback.value = '✅ 翻译完美！(Perfect Translation!)';
+                    vocabFeedbackType.value = 'msg-success';
+                } else if (userText.includes(wordCore)) {
+                    vocabFeedback.value = `📝 意思接近！标准答案参考: ${currentWord.value.practice.answer}`;
+                    vocabFeedbackType.value = 'msg-success'; 
+                } else {
+                    vocabFeedback.value = `💡 似乎不太对。标准答案是: ${currentWord.value.practice.answer}`;
+                    vocabFeedbackType.value = 'msg-error';
+                }
+            };
+
+            watch(currentWord, () => {
+                vocabInput.value = '';
+                vocabFeedback.value = '';
+            });
+
+            // 2. 课文模块
+            const showPinyin = ref(true);
+            const isClozeMode = ref(false); 
+            
+            const toggleMark = (line) => {
+                line.isMarked = !line.isMarked;
+                if(line.isMarked) {
+                    showToast("已将您的疑问发送给老师 📡");
+                    const cleanText = line.chinese.replace(/<[^>]*>?/gm, '');
+                    const payload = new URLSearchParams();
+                    payload.append('studentName', studentName.value || '【匿名提问】');
+                    payload.append('lesson', lessonTitle.value);
+                    payload.append('weakPoints', '【学生求助】' + cleanText); 
+                    
+                    fetch(googleAppUrl, { method: 'POST', mode: 'no-cors', body: payload })
+                        .catch(err => console.log("标记发送错误", err));
+                }
+            };
+
+            const readingData = ref([
+                {
+                    textId: 1, context: "在教室 / In the classroom", audioSrc: "audio/text1.mp3", activeIndex: -1, isPlaying: false, audioObj: null, textStartTime: 24, textEndTime: 46,
+                    dialogue: [
+                        { speaker: "朋友", chinese: "大山，你和马可谁<b class='new-word'>个子</b>高？", cloze: "大山，你和马可谁<span class='cloze-blank'></span>高？", pinyin: "Dàshān, nǐ hé Mǎkě shéi gèzi gāo?", english: "Dashan, who is taller, you or Marco?", isMarked: false },
+                        { speaker: "大山", chinese: "马可比我高，我比马可<b class='new-word'>矮</b>一点儿。", cloze: "马可比我高，我比马可<span class='cloze-blank'></span>一点儿。", pinyin: "Mǎkě bǐ wǒ gāo, wǒ bǐ Mǎkě ǎi yìdiǎnr.", english: "Marco is taller than me, I am a little shorter than Marco.", isMarked: false },
+                        { speaker: "朋友", chinese: "那你们谁大？", cloze: "那你们谁大？", pinyin: "Nà nǐmen shéi dà?", english: "Then who is older?", isMarked: false },
+                        { speaker: "大山", chinese: "我比马可大两岁。", cloze: "我比马可大两岁。", pinyin: "Wǒ bǐ Mǎkě dà liǎng suì.", english: "I am two years older than Marco.", isMarked: false },
+                        { speaker: "朋友", chinese: "你们谁的汉语说得更好？", cloze: "你们谁的汉语说得更好？", pinyin: "Nǐmen shéi de hànyǔ shuō de gèng hǎo?", english: "Whose Chinese is better?", isMarked: false },
+                        { speaker: "大山", chinese: "马可比我说得好一些，我的汉语没有他好。", cloze: "马可比我说得好一些，我的汉语没有他好。", pinyin: "Mǎkě bǐ wǒ shuō de hǎo yìxiē, wǒ de hànyǔ méiyǒu tā hǎo.", english: "Marco speaks a bit better than me, my Chinese is not as good as his.", isMarked: false }
+                    ]
+                },
+                {
+                    textId: 2, context: "在教室 / In the classroom", audioSrc: "audio/text2.mp3", activeIndex: -1, isPlaying: false, audioObj: null, textStartTime: 10, textEndTime: 31,
+                    dialogue: [
+                        { speaker: "小明", chinese: "我喜欢<b class='new-word'>历史</b>课、<b class='new-word'>体育</b>课，不喜欢<b class='new-word'>数学</b>课。", cloze: "我喜欢<span class='cloze-blank'></span>课、<span class='cloze-blank'></span>课，不喜欢<span class='cloze-blank'></span>课。", pinyin: "Wǒ xǐhuan lìshǐ kè, tǐyù kè, bù xǐhuan shùxué kè.", english: "I like history class and PE class, I don't like math class.", isMarked: false },
+                        { speaker: "同学", chinese: "为什么？数学也很有意思啊。", cloze: "为什么？数学也很有意思啊。", pinyin: "Wèi shénme? Shùxué yě hěn yǒu yìsi a.", english: "Why? Math is also very interesting.", isMarked: false },
+                        { speaker: "小明", chinese: "我觉得数学比历史难多了，我听不懂。", cloze: "我觉得数学比历史难多了，我听不懂。", pinyin: "Wǒ juéde shùxué bǐ lìshǐ nán duō le, wǒ tīng bu dǒng.", english: "I think math is much harder than history, I don't understand it.", isMarked: false },
+                        { speaker: "同学", chinese: "别担心，我可以帮你。", cloze: "别担心，我可以帮你。", pinyin: "Bié dān xīn, wǒ kěyǐ bāng nǐ.", english: "Don't worry, I can help you.", isMarked: false },
+                        { speaker: "小明", chinese: "好啊，我们每天学多长时间？", cloze: "好啊，我们每天学多长时间？", pinyin: "Hǎo a, wǒmen měitiān xué duō cháng shíjiān?", english: "Okay, how long do we study every day?", isMarked: false },
+                        { speaker: "同学", chinese: "一两个小时吧。", cloze: "一两个小时吧。", pinyin: "Yì liǎng ge xiǎoshí ba.", english: "About one or two hours.", isMarked: false }
+                    ]
+                },
+                {
+                    textId: 3, context: "在休息室 / In the lounge", audioSrc: "audio/text3.mp3", activeIndex: -1, isPlaying: false, audioObj: null, textStartTime: 11, textEndTime: 37,
+                    dialogue: [
+                        { speaker: "同事", chinese: "你最近比以前来得早多了，搬家了？", cloze: "你最近比以前来得早多了，搬家了？", pinyin: "Nǐ zuìjìn bǐ yǐqián lái de zǎo duō le, bān jiā le?", english: "You come much earlier than before recently, did you move?", isMarked: false },
+                        { speaker: "小丽", chinese: "是啊，你不知道？我上个月就搬家了，走路二十分钟就到。", cloze: "是啊，你不知道？我上个月就搬家了，走路二十分钟就到。", pinyin: "Shì a, nǐ bù zhīdào? Wǒ shàng ge yuè jiù bān jiā le, zǒulù èrshí fēnzhōng jiù dào.", english: "Yes, didn't you know? I moved last month, it's only a 20-minute walk.", isMarked: false },
+                        { speaker: "同事", chinese: "那很<b class='new-word'>方便</b>啊。", cloze: "那很<span class='cloze-blank'></span>啊。", pinyin: "Nà hěn fāngbiàn a.", english: "That's very convenient.", isMarked: false },
+                        { speaker: "小丽", chinese: "我还打算买辆<b class='new-word'>自行车</b>，<b class='new-word'>骑</b>车七八分钟就能到。", cloze: "我还打算买辆<span class='cloze-blank'></span>，<span class='cloze-blank'></span>车七八分钟就能到。", pinyin: "Wǒ hái dǎsuàn mǎi liàng zìxíngchē, qí chē qī bā fēnzhōng jiù néng dào.", english: "I also plan to buy a bicycle, it takes only 7 or 8 minutes by riding.", isMarked: false },
+                        { speaker: "同事", chinese: "你不是有一辆吗？", cloze: "你不是有一辆吗？", pinyin: "Nǐ bú shì yǒu yí liàng ma?", english: "Don't you have one?", isMarked: false },
+                        { speaker: "小丽", chinese: "那辆太<b class='new-word'>旧</b>了，要<b class='new-word'>换</b>一辆，很便宜，两三百块钱。", cloze: "那辆太<span class='cloze-blank'></span>了，要<span class='cloze-blank'></span>一辆，很便宜，两三百块钱。", pinyin: "Nà liàng tài jiù le, yào huàn yí liàng, hěn piányi, liǎng sān bǎi kuài qián.", english: "That one is too old, I need to change for a new one, it's very cheap, 200 or 300 RMB.", isMarked: false }
+                    ]
+                },
+                {
+                    textId: 4, context: "看房子 / House viewing", audioSrc: "audio/text4.mp3", activeIndex: -1, isPlaying: false, audioObj: null, textStartTime: 11, textEndTime: 43,
+                    dialogue: [
+                        { speaker: "小丽", chinese: "这两个<b class='new-word'>地方</b>的房子一样吗？", cloze: "这两个<span class='cloze-blank'></span>的房子一样吗？", pinyin: "Zhè liǎng ge dìfang de fángzi yíyàng ma?", english: "Are the houses in these two places the same?", isMarked: false },
+                        { speaker: "中介", chinese: "不一样。您看，学校外边的房子比学校里边的大一些。", cloze: "不一样。您看，学校外边的房子比学校里边的大一些。", pinyin: "Bù yíyàng. Nín kàn, xuéxiào wàibian de fángzi bǐ xuéxiào lǐbian de dà yìxiē.", english: "No. Look, the houses outside the school are a bit bigger than the ones inside.", isMarked: false },
+                        { speaker: "小丽", chinese: "大小没关系，<b class='new-word'>主要</b>是<b class='new-word'>环境</b>，哪个更安静？", cloze: "大小没关系，<span class='cloze-blank'></span>是<span class='cloze-blank'></span>，哪个更安静？", pinyin: "Dàxiǎo méi guānxi, zhǔyào shì huánjìng, nǎge gèng ānjìng?", english: "Size doesn't matter, the main thing is the environment, which one is quieter?", isMarked: false },
+                        { speaker: "中介", chinese: "学校里边的没有学校外边的那么安静。", cloze: "学校里边的没有学校外边的那么安静。", pinyin: "Xuéxiào lǐbian de méiyǒu xuéxiào wàibian de nàme ānjìng.", english: "The ones inside the school are not as quiet as the ones outside.", isMarked: false },
+                        { speaker: "小丽", chinese: "哪个方便一些呢？", cloze: "哪个方便一些呢？", pinyin: "Nǎge fāngbiàn yìxiē ne?", english: "Which one is more convenient?", isMarked: false },
+                        { speaker: "中介", chinese: "学校里边比学校外边方便，<b class='new-word'>附近</b>有三四个车站。", cloze: "学校里边比学校外边方便，<span class='cloze-blank'></span>有三四个车站。", pinyin: "Xuéxiào lǐbian bǐ xuéxiào wàibian fāngbiàn, fùjìn yǒu sān sì ge chēzhàn.", english: "Inside the school is more convenient than outside, there are three or four stations nearby.", isMarked: false }
+                    ]
+                }
+            ]);
+
+            readingData.value.forEach(scene => {
+                const totalDuration = scene.textEndTime - scene.textStartTime;
+                const totalChars = scene.dialogue.reduce((sum, line) => sum + line.chinese.length, 0);
+                let currentStartTime = scene.textStartTime;
+                scene.dialogue.forEach(line => {
+                    const lineDuration = totalDuration * (line.chinese.length / totalChars);
+                    line.startTime = currentStartTime;
+                    line.endTime = currentStartTime + lineDuration;
+                    currentStartTime += lineDuration; 
+                });
+            });
+
+            const pauseAllAudio = () => {
+                readingData.value.forEach(scene => {
+                    if(scene.audioObj) { scene.audioObj.pause(); scene.isPlaying = false; scene.activeIndex = -1; }
+                });
+                if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+            };
+
+            const togglePlay = (scene) => {
+                readingData.value.forEach(s => {
+                    if(s.textId !== scene.textId && s.audioObj) { s.audioObj.pause(); s.isPlaying = false; s.activeIndex = -1; }
+                });
+                if (!scene.audioObj) {
+                    scene.audioObj = new Audio(scene.audioSrc);
+                    scene.audioObj.addEventListener('timeupdate', () => {
+                        const ct = scene.audioObj.currentTime;
+                        if (ct < scene.textStartTime || ct > scene.textEndTime) { scene.activeIndex = -1; } 
+                        else { const idx = scene.dialogue.findIndex(l => ct >= l.startTime && ct < l.endTime); scene.activeIndex = idx; }
+                    });
+                    scene.audioObj.addEventListener('ended', () => { scene.activeIndex = -1; scene.isPlaying = false; });
+                }
+                if (scene.isPlaying) { scene.audioObj.pause(); scene.isPlaying = false; } 
+                else { scene.audioObj.currentTime = scene.textStartTime; scene.audioObj.play().catch(e => { console.error("Audio error", e); }); scene.isPlaying = true; }
+            };
+
+            const playFromLine = (scene, startTime) => {
+                readingData.value.forEach(s => {
+                    if(s.textId !== scene.textId && s.audioObj) { s.audioObj.pause(); s.isPlaying = false; s.activeIndex = -1; }
+                });
+                if (!scene.audioObj) {
+                    scene.audioObj = new Audio(scene.audioSrc);
+                    scene.audioObj.addEventListener('timeupdate', () => {
+                        const ct = scene.audioObj.currentTime;
+                        if (ct < scene.textStartTime || ct > scene.textEndTime) { scene.activeIndex = -1; } 
+                        else { const idx = scene.dialogue.findIndex(l => ct >= l.startTime && ct < l.endTime); scene.activeIndex = idx; }
+                    });
+                    scene.audioObj.addEventListener('ended', () => { scene.activeIndex = -1; scene.isPlaying = false; });
+                }
+                scene.audioObj.currentTime = startTime; 
+                scene.audioObj.play().catch(e => { console.error(e); });
+                scene.isPlaying = true;
+            };
+
+            // 3. 测验模块 (恢复25道题配置)
+            const studentName = ref('');
+            const studentNameEntered = ref(false);
+            const wrongRecords = ref([]);
+            const isSubmitting = ref(false);
+            const submitSuccess = ref(false);
+            
+            const inputText = ref('');
+            const inputResult = ref(false);
+
+            // 连词成句游戏逻辑
+            const orderBank = ref([]);
+            const orderAnswer = ref([]);
+
+            const originalQuizData = [
+                // 1-5 连词成句 (5)
+                { kp: "语法：A比B+形+一点儿", type: 'order', question: "连词成句 (Build the sentence):", words: ["马可", "比我高，", "我比", "马可", "矮", "一点儿。"], correctAnswer: "马可比我高，我比马可矮一点儿。" },
+                { kp: "语法：A比B+形+多了", type: 'order', question: "连词成句 (Build the sentence):", words: ["数学", "比历史", "难多了。"], correctAnswer: "数学比历史难多了。" },
+                { kp: "语法：A比B+形+一些", type: 'order', question: "连词成句 (Build the sentence):", words: ["学校", "外边的房子", "比", "学校里边的", "大", "一些。"], correctAnswer: "学校外边的房子比学校里边的大一些。" },
+                { kp: "概数：七八", type: 'order', question: "连词成句 (Build the sentence):", words: ["骑车", "七八分钟", "就能", "到。"], correctAnswer: "骑车七八分钟就能到。" },
+                { kp: "语法：A没有B+形", type: 'order', question: "连词成句 (Build the sentence):", words: ["学校", "里边的", "没有", "学校外边的", "那么", "安静。"], correctAnswer: "学校里边的没有学校外边的那么安静。" },
+                
+                // 6-10 词汇选择 (5)
+                { kp: "词汇：个子", type: 'choice', question: "What is the correct meaning for '个子' (gèzi)?", options: ["Height / Stature", "Old / Used", "Place", "Agent"], correctAnswer: "Height / Stature" },
+                { kp: "词汇：旧", type: 'choice', question: "Which word means 'Old / used'?", options: ["矮 (ǎi)", "主要 (zhǔyào)", "旧 (jiù)", "换 (huàn)"], correctAnswer: "旧 (jiù)" },
+                { kp: "词汇：环境", type: 'choice', question: "What is the correct meaning for '环境' (huánjìng)?", options: ["Nearby", "Bicycle", "History", "Environment"], correctAnswer: "Environment" },
+                { kp: "词汇：附近", type: 'choice', question: "Which word means 'Nearby / vicinity'?", options: ["附近 (fùjìn)", "地方 (dìfang)", "主要 (zhǔyào)", "体育 (tǐyù)"], correctAnswer: "附近 (fùjìn)" },
+                { kp: "词汇：主要", type: 'choice', question: "What is the correct meaning for '主要' (zhǔyào)?", options: ["Main / mainly", "Mathematics", "Convenient", "To change"], correctAnswer: "Main / mainly" },
+                
+                // 11-15 选词填空 (5)
+                { kp: "概数：两", type: 'fill', question: "我比马可大___岁。", options: ["二", "两", "双"], correctAnswer: "两" },
+                { kp: "语法：比", type: 'fill', question: "数学___历史难多了。", options: ["跟", "比", "没"], correctAnswer: "比" },
+                { kp: "概数：七八", type: 'fill', question: "骑车___八分钟就能到。", options: ["五", "六", "七"], correctAnswer: "七" },
+                { kp: "概数：三四", type: 'fill', question: "附近有___四个车站。", options: ["一", "二", "三"], correctAnswer: "三" },
+                { kp: "语法：比", type: 'fill', question: "学校里边___学校外边方便。", options: ["有", "没", "比"], correctAnswer: "比" },
+                
+                // 16-20 课文理解 (5)
+                { kp: "课文理解：课文1", type: 'choice', question: "根据课文 1，大山和马可谁的个子高？", options: ["大山", "马可", "一样高", "不知道"], correctAnswer: "马可" },
+                { kp: "课文理解：课文2", type: 'choice', question: "根据课文 2，小明不喜欢什么课？", options: ["历史课", "体育课", "数学课", "汉语课"], correctAnswer: "数学课" },
+                { kp: "课文理解：课文3", type: 'choice', question: "根据课文 3，小丽走路到公司要多久？", options: ["七八分钟", "十分钟", "二十分钟", "一个小时"], correctAnswer: "二十分钟" },
+                { kp: "课文理解：课文4", type: 'choice', question: "根据课文 4，学校外边的房子怎么样？", options: ["比里边的小", "比里边的大", "没有里边的安静", "非常便宜"], correctAnswer: "比里边的大" },
+                { kp: "课文理解：课文4", type: 'choice', question: "根据课文 4，哪里更方便？", options: ["学校里边", "学校外边", "都一样", "中介公司"], correctAnswer: "学校里边" },
+                
+                // 21-25 打字输入 (5)
+                { kp: "拼写：自行车", type: 'input', question: "Please type the Chinese characters for <b>'bicycle'</b>:", correctAnswer: "自行车" },
+                { kp: "拼写：数学", type: 'input', question: "Please type the Chinese characters for <b>'mathematics'</b>:", correctAnswer: "数学" },
+                { kp: "拼写：历史", type: 'input', question: "Please type the Chinese characters for <b>'history'</b>:", correctAnswer: "历史" },
+                { kp: "拼写：方便", type: 'input', question: "Please type the Chinese characters for <b>'convenient'</b>:", correctAnswer: "方便" },
+                { kp: "拼写：中介", type: 'input', question: "Please type the Chinese characters for <b>'agent'</b>:", correctAnswer: "中介" }
+            ];
+
+            const quizData = ref([]);
+
+            const shuffleArray = (array) => {
+                for (let i = array.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [array[i], array[j]] = [array[j], array[i]];
+                }
+                return array;
+            };
+
+            const startQuiz = () => { 
+                if (studentName.value.trim()) {
+                    studentNameEntered.value = true;
+                    quizData.value = shuffleArray([...originalQuizData]);
+                    initOrderQuestion();
+                } 
+            };
+
+            const quizIndex = ref(0); const quizScore = ref(0); const selectedOption = ref(null); const isAnswered = ref(false); const showQuizResult = ref(false);
+            
+            const currentQuestion = computed(() => quizData.value.length > 0 ? quizData.value[quizIndex.value] : originalQuizData[0]);
+            const quizProgress = computed(() => quizData.value.length > 0 ? (quizIndex.value / quizData.value.length) * 100 : 0);
+            const wrongKPs = computed(() => [...new Set(wrongRecords.value)]);
+
+            // 连词成句逻辑初始化
+            const initOrderQuestion = () => {
+                if (currentQuestion.value.type === 'order') {
+                    orderBank.value = currentQuestion.value.words.map((w, i) => ({ id: i, text: w }));
+                    shuffleArray(orderBank.value);
+                    orderAnswer.value = [];
+                }
+            };
+
+            watch(quizIndex, () => {
+                initOrderQuestion();
+            });
+
+            const addToOrder = (item) => {
+                orderAnswer.value.push(item);
+                orderBank.value = orderBank.value.filter(i => i.id !== item.id);
+            };
+
+            const removeFromOrder = (item) => {
+                orderBank.value.push(item);
+                orderAnswer.value = orderAnswer.value.filter(i => i.id !== item.id);
+            };
+
+            const checkOrder = () => {
+                isAnswered.value = true;
+                const userStr = orderAnswer.value.map(i => i.text).join('');
+                if (userStr === currentQuestion.value.correctAnswer) {
+                    quizScore.value++;
+                    inputResult.value = true;
+                } else {
+                    inputResult.value = false;
+                    wrongRecords.value.push(currentQuestion.value.kp);
+                }
+            };
+
+            const selectOption = (option) => {
+                if (isAnswered.value) return;
+                selectedOption.value = option;
+                isAnswered.value = true;
+                if (option === currentQuestion.value.correctAnswer) {
+                    quizScore.value++;
+                } else {
+                    wrongRecords.value.push(currentQuestion.value.kp);
+                }
+            };
+
+            const checkInput = () => {
+                if (isAnswered.value) return;
+                isAnswered.value = true;
+                if (inputText.value.trim() === currentQuestion.value.correctAnswer) {
+                    quizScore.value++;
+                    inputResult.value = true;
+                } else {
+                    inputResult.value = false;
+                    wrongRecords.value.push(currentQuestion.value.kp);
+                }
+            };
+
+            const getOptionClass = (option) => {
+                if (!isAnswered.value) return '';
+                if (option === currentQuestion.value.correctAnswer) return 'correct';
+                if (option === selectedOption.value) return 'wrong';
+                return '';
+            };
+
+            const submitDataToServer = () => {
+                showQuizResult.value = true; 
+                isSubmitting.value = true;
+                submitSuccess.value = false;
+
+                const formData = new URLSearchParams();
+                formData.append('studentName', studentName.value);
+                formData.append('lesson', lessonTitle.value);
+                formData.append('score', quizScore.value);
+                formData.append('total', quizData.value.length);
+                formData.append('weakPoints', wrongKPs.value.join(" | ") || "全对");
+
+                fetch(googleAppUrl, {
+                    method: 'POST',
+                    mode: 'no-cors',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: formData.toString()
+                }).then(() => {
+                    submitSuccess.value = true;
+                }).catch(error => {
+                    console.error("成绩上传失败", error);
+                }).finally(() => {
+                    isSubmitting.value = false;
+                });
+            };
+
+            const nextQuestion = () => {
+                if (quizIndex.value < quizData.value.length - 1) { 
+                    quizIndex.value++; 
+                    selectedOption.value = null; 
+                    inputText.value = ''; 
+                    isAnswered.value = false; 
+                } else { 
+                    submitDataToServer(); 
+                }
+            };
+
+            const restartQuiz = () => { 
+                quizIndex.value = 0; quizScore.value = 0; selectedOption.value = null; inputText.value = ''; isAnswered.value = false; 
+                showQuizResult.value = false; wrongRecords.value = []; submitSuccess.value = false;
+                quizData.value = shuffleArray([...originalQuizData]);
+                initOrderQuestion();
+            };
+
+            return {
+                lessonTitle, lessonEnglishTitle, currentTab,
+                vocabData, vocabIndex, currentWord, isFlipped, toggleFlip, nextWord, prevWord, playVocabAudio,
+                vocabInput, vocabFeedback, vocabFeedbackType, checkTranslation,
+                showPinyin, isClozeMode, readingData, togglePlay, playFromLine, pauseAllAudio, toggleMark,
+                quizData, quizIndex, currentQuestion, quizScore, isAnswered, showQuizResult, quizProgress, 
+                selectOption, getOptionClass, nextQuestion, restartQuiz,
+                studentName, studentNameEntered, startQuiz, wrongKPs, isSubmitting, submitSuccess,
+                inputText, inputResult, checkInput,
+                orderBank, orderAnswer, addToOrder, removeFromOrder, checkOrder,
+                toastVisible, toastMsg
+            }
+        }
+    }).mount('#app');
+</script>
+
+</body>
+</html>
